@@ -66,6 +66,8 @@ export async function buildWeb(o) {
   const pageRpc = checkPageRpc(o.pageRpc ?? DEFAULT_PAGE_RPC, { allowLocal: !o.mainnetOnly });
   const d = JSON.parse(readFileSync(o.deployment ?? defaultDeployment(), 'utf8'));
   const client = createPublicClient({ transport: http(o.rpc) });
+  // Optional separate RPC for getLogs (the bot uses a public log RPC and a private read RPC).
+  const logClient = o.logRpc ? createPublicClient({ transport: http(o.logRpc) }) : client;
   const rpcChain = await client.getChainId();
   if (o.mainnetOnly && (d.chainId !== 56 || rpcChain !== 56)) throw new Error(`Mainnet build needs chain 56 (deployment ${d.chainId}, RPC ${rpcChain}).`);
   if (rpcChain !== d.chainId) throw new Error(`The read RPC is on chain ${rpcChain}, the deployment file says ${d.chainId}.`);
@@ -84,7 +86,7 @@ export async function buildWeb(o) {
   const markets = [];
   for (let from = BigInt(d.block); from <= latest; from += 5000n) {
     const to = from + 4999n > latest ? latest : from + 4999n;
-    const logs = await client.getLogs({ address: d.marketFactory, event: created, fromBlock: from, toBlock: to });
+    const logs = await logClient.getLogs({ address: d.marketFactory, event: created, fromBlock: from, toBlock: to });
     for (const l of logs) {
       if (l.args.adjudicator.toLowerCase() !== d.adjudicator.toLowerCase()) continue;
       const t = await client.readContract({ address: d.adjudicator, abi: termsAbi, functionName: 'terms', args: [l.args.market] });

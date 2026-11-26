@@ -17,31 +17,33 @@ import { analyze, marketTitle } from "./src/report.mjs";
 import { loadEnvFiles } from "./src/env.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-// agent/.env first, then the repo root .env. Values already in the environment win. Nothing is printed.
-loadEnvFiles([join(HERE, ".env"), join(HERE, "..", ".env")]);
 
-const { values: args } = parseArgs({
-  options: {
-    market: { type: "string" },
-    rpc: { type: "string" },
-    amm: { type: "string" },
-    asset: { type: "string" },
-    "cournot-id": { type: "string" },
-    "cournot-message": { type: "string" },
-    "no-cournot": { type: "boolean", default: false },
-    "refresh-cournot": { type: "boolean", default: false },
-    // The Cournot market states the opposite claim (for example "above $465" for our "below $465").
-    "cournot-invert": { type: "boolean", default: false },
-    bankroll: { type: "string" },
-    threshold: { type: "string" },
-    slippage: { type: "string", default: "0.02" },
-    execute: { type: "boolean", default: false },
-    offline: { type: "boolean", default: false },
-    fixture: { type: "string" },
-    out: { type: "string", default: join(HERE, "out") },
-    quiet: { type: "boolean", default: false },
-  },
-});
+function cliArgs() {
+  return parseArgs({
+    options: {
+      market: { type: "string" },
+      rpc: { type: "string" },
+      amm: { type: "string" },
+      asset: { type: "string" },
+      "cournot-id": { type: "string" },
+      "cournot-message": { type: "string" },
+      "no-cournot": { type: "boolean", default: false },
+      "refresh-cournot": { type: "boolean", default: false },
+      // The Cournot market states the opposite claim (for example "above $465" for our "below $465").
+      "cournot-invert": { type: "boolean", default: false },
+      bankroll: { type: "string" },
+      threshold: { type: "string" },
+      slippage: { type: "string", default: "0.02" },
+      execute: { type: "boolean", default: false },
+      offline: { type: "boolean", default: false },
+      fixture: { type: "string" },
+      out: { type: "string", default: join(HERE, "out") },
+      quiet: { type: "boolean", default: false },
+    },
+  }).values;
+}
+
+let args = { quiet: true, out: join(HERE, "out") };
 
 const jsonSafe = (_k, v) => (typeof v === "bigint" ? v.toString() : v);
 const log = (...m) => { if (!args.quiet) console.error(...m); };
@@ -53,9 +55,9 @@ function decideOpts() {
   return o;
 }
 
-function writeReport(report) {
-  mkdirSync(args.out, { recursive: true });
-  const file = join(args.out, `${report.market.toLowerCase()}.json`);
+export function writeReport(report, outDir = args.out) {
+  mkdirSync(outDir, { recursive: true });
+  const file = join(outDir, `${report.market.toLowerCase()}.json`);
   writeFileSync(file, JSON.stringify(report, jsonSafe, 2));
   return file;
 }
@@ -107,72 +109,106 @@ async function runOffline(path) {
 async function runOnline() {
   const rpc = args.rpc ?? process.env.RPC_URL ?? process.env.BSC_RPC_URL;
   if (!args.market || !rpc) throw new Error("Need --market and --rpc (or RPC_URL).");
-  const client = makePublicClient(rpc);
-  log("Reading Sooth market…");
-  const chain = await readMarket(client, args.market, { amm: args.amm ?? process.env.AMM_ADDRESS });
-  chain.chainId = await client.getChainId();
-  const asset = args.asset ?? (chain.terms && assetForTerms(chain.terms));
+  let cournotMode = "resolve";
+  if (args["no-cournot"]) cournotMode = "off";
+  else if (args["cournot-id"]) cournotMode = { id: args["cournot-id"], force: args["refresh-cournot"], invert: args["cournot-invert"] };
+  const pk = process.env.PRIVATE_KEY;
+  if (args.execute && !pk) throw new Error("--execute needs PRIVATE_KEY in the environment.");
+  return runMarket({
+    client: makePublicClient(rpc), market: args.market, amm: args.amm ?? process.env.AMM_ADDRESS, asset: args.asset,
+    cournotMode, cournotMessage: args["cournot-message"], decideOpts: decideOpts(), slippage: Number(args.slippage),
+    account: pk ? privateKeyToAccount(pk.startsWith("0x") ? pk : `0x${pk}`).address : null,
+    wallet: args.execute ? walletFromEnv(rpc) : null, execute: args.execute, log,
+  });
+}
+
+/**
+ * Analyze one market and, with `execute`, send the trade. Used by the CLI and by bot.mjs.
+ * @param {object} o
+ * @param {object} o.client           viem public client
+ * @param {string} o.market
+ * @param {string} [o.amm]
+ * @param {string} [o.asset]          default: from the feed terms
+ * @param {object} [o.snapshot]       CMC snapshot to reuse; fetched when missing
+ * @param {"off"|"resolve"|{id:string,force?:boolean,invert?:boolean}} [o.cournotMode]
+ * @param {number|null} [o.maxSpendUsd] spend left for this trade (daily cap); null means no cap
+ * @param {(req: object) => Promise<object>} [o.prepare] adds gas fields to each tx before it is sent
+ */
+export async function runMarket({ client, market, amm, asset, snapshot, cournotMode = "resolve", cournotMessage, decideOpts: dOpts = {},
+  slippage = 0.02, account = null, wallet = null, execute = false, maxSpendUsd = null, prepare, log: say = () => {}, chain: chainIn } = {}) {
+  say("Reading Sooth market…");
+  const chain = chainIn ?? await readMarket(client, market, { amm });
+  chain.chainId ??= await client.getChainId();
+  asset ??= chain.terms && assetForTerms(chain.terms);
   if (!asset || !ASSETS[asset]) throw new Error(`Cannot map the market feed to an asset. Pass --asset (${Object.keys(ASSETS).join(", ")}).`);
 
-  log(`Fetching CoinMarketCap data for ${asset}…`);
-  const snapshot = await fetchSnapshot(asset);
+  if (!snapshot) {
+    say(`Fetching CoinMarketCap data for ${asset}…`);
+    snapshot = await fetchSnapshot(asset);
+  }
 
   let c = { state: "skipped" };
-  const message = args["cournot-message"] ?? marketTitle(asset, chain.terms, chain.deadline);
-  if (!args["no-cournot"]) {
-    if (args["cournot-id"]) {
-      const force = args["refresh-cournot"];
-      log(`Cournot probability for market ${args["cournot-id"]} (${force ? "refresh: this spends a call" : "cached forever per id; --refresh-cournot to call again"})…`);
-      c = await cournot.probability(args["cournot-id"], message, { force });
-      if (args["cournot-invert"] && c.state === "complete" && Number.isFinite(c.probability)) {
+  const message = cournotMessage ?? marketTitle(asset, chain.terms, chain.deadline);
+  if (cournotMode && cournotMode !== "off") {
+    if (typeof cournotMode === "object" && cournotMode.id) {
+      const force = !!cournotMode.force;
+      say(`Cournot probability for market ${cournotMode.id} (${force ? "refresh: this spends a call" : "cached forever per id; --refresh-cournot to call again"})…`);
+      c = await cournot.probability(cournotMode.id, message, { force });
+      if (cournotMode.invert && c.state === "complete" && Number.isFinite(c.probability)) {
         c = { ...c, sourceProbability: c.probability, probability: 1 - c.probability, inverted: true };
-        log(`Cournot states the opposite claim: using 1 - ${c.sourceProbability.toFixed(3)}.`);
+        say(`Cournot states the opposite claim: using 1 - ${c.sourceProbability.toFixed(3)}.`);
       }
     } else {
       // resolve is free. Probability is only called with an explicit --cournot-id.
       const r = await cournot.resolve(message, { limit: 5 }).catch((e) => ({ state: "network_error", error: e.message, candidates: [] }));
       c = { state: "skipped", resolveCandidates: r.candidates, suggestedId: r.picked?.id ?? null };
-      if (r.picked) log(`Cournot match: id ${r.picked.id} (${r.picked.title}). Rerun with --cournot-id ${r.picked.id} to fetch its probability.`);
+      if (r.picked) say(`Cournot match: id ${r.picked.id} (${r.picked.title}). Rerun with --cournot-id ${r.picked.id} to fetch its probability.`);
     }
   }
 
-  const report = analyze({ chain, snapshot, cournot: c, asset, opts: decideOpts() });
-  report.mode = args.execute ? "execute" : "dry-run";
+  const report = analyze({ chain, snapshot, cournot: c, asset, opts: dOpts });
+  report.mode = execute ? "execute" : "dry-run";
   report.cournotMessage = message;
   if (c.resolveCandidates) report.inputs.cournot.resolveCandidates = c.resolveCandidates;
 
   const d = report.decision;
+  const hold = (reason) => {
+    d.preImpact ??= { action: d.action, sizeUsd: d.sizeUsd };
+    Object.assign(d, { action: "HOLD", fraction: 0, sizeUsd: 0, reason });
+    delete d.outcome;
+    return report;
+  };
+  if ((d.action === "BUY_YES" || d.action === "BUY_NO") && maxSpendUsd != null) {
+    // Daily cap: the cost with slippage must fit in what is left today.
+    const left = Math.floor((maxSpendUsd / (1 + slippage)) * 100) / 100;
+    if (left < 1) return hold(`Daily spend cap reached ($${maxSpendUsd.toFixed(2)} left).`);
+    if (d.sizeUsd > left) { d.capped = { from: d.sizeUsd, to: left }; d.sizeUsd = left; }
+  }
   let plan = null;
   if (d.action === "BUY_YES" || d.action === "BUY_NO") {
     // Fit the size so the cost with fee stays inside sizeUsd, then check the edge after impact.
     plan = await planBuy((shares) => quoteBuy(client, { market: chain.market, amm: chain.amm, outcome: d.outcome, shares }), d);
     d.sizing = plan.quote && { shares: wadToFloat(plan.quote.shares), netAmount: wadToFloat(plan.quote.netAmount), newPrice: plan.quote.newPrice };
-    if (!plan.ok) {
-      d.preImpact = { action: d.action, sizeUsd: d.sizeUsd };
-      Object.assign(d, { action: "HOLD", fraction: 0, sizeUsd: 0, reason: plan.reason });
-      delete d.outcome;
-      return report;
-    }
+    if (!plan.ok) return hold(plan.reason);
   }
   if (d.action === "BUY_YES" || d.action === "BUY_NO") {
-    const pk = process.env.PRIVATE_KEY;
-    const account = pk ? privateKeyToAccount(pk.startsWith("0x") ? pk : `0x${pk}`).address : null;
-    const shares = plan.shares;
+    const from = account ?? wallet?.account?.address ?? null;
     const built = await buildTrade(client, {
-      market: chain.market, amm: chain.amm, outcome: d.outcome, shares,
-      slippage: Number(args.slippage), decimals: chain.decimals, tokenA: chain.tokenA, account,
+      market: chain.market, amm: chain.amm, outcome: d.outcome, shares: plan.shares,
+      slippage, decimals: chain.decimals, tokenA: chain.tokenA, account: from,
     });
-    report.tx = { from: account, ...built };
-    if (args.execute) {
-      if (!pk) throw new Error("--execute needs PRIVATE_KEY in the environment.");
-      log("Sending trade…");
-      report.tx.sent = await sendTrade(client, walletFromEnv(rpc), built);
+    report.tx = { from, ...built };
+    if (execute) {
+      if (!wallet) throw new Error("execute needs a wallet.");
+      say("Sending trade…");
+      report.tx.sent = await sendTrade(client, wallet, built, { prepare });
     }
   }
   return report;
 }
 
 async function main() {
+  args = cliArgs();
   const report = args.offline ? await runOffline(args.fixture ?? join(HERE, "test/fixtures/demo-bnb.json")) : await runOnline();
   const file = writeReport(report);
   console.log(summary(report));
@@ -181,7 +217,11 @@ async function main() {
   console.log(`Report   ${file}`);
 }
 
-main().catch((e) => {
-  console.error(`Error: ${e.shortMessage ?? e.message}`);
-  process.exit(1);
-});
+if (process.argv[1] && resolvePath(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  // agent/.env first, then the repo root .env. Values already in the environment win. Nothing is printed.
+  loadEnvFiles([join(HERE, ".env"), join(HERE, "..", ".env")]);
+  main().catch((e) => {
+    console.error(`Error: ${e.shortMessage ?? e.message}`);
+    process.exit(1);
+  });
+}

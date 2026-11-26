@@ -18,6 +18,7 @@
 import { spawnSync } from 'node:child_process';
 import { createPublicClient, http, parseAbi, formatUnits, parseUnits } from 'viem';
 import { fairProbability, KIND } from '../agent/src/model.mjs';
+import { cleanStep, ladderStrikes } from '../agent/src/ladder.mjs';
 
 const ATLAS = '0xEAcE519ebB14fB8404fA6DdD23C3b34abaDE44aa';
 const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) => {
@@ -25,24 +26,8 @@ const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) =>
   return acc;
 }, []));
 
-/** A clean step near `x`: 1, 2, 2.5 or 5 times a power of ten, nearest on a log scale. */
-export function cleanStep(x) {
-  const p = 10 ** Math.floor(Math.log10(x));
-  return [1, 2, 2.5, 5, 10].map((m) => m * p).sort((a, b) => Math.abs(Math.log(a / x)) - Math.abs(Math.log(b / x)))[0];
-}
-
-/** Strikes below spot, rounded down to `round`, without duplicates, highest first. */
-export function ladderStrikes(spot, steps, round) {
-  const dp = Math.max(0, -Math.floor(Math.log10(round)) + 1);
-  const out = [], dropped = [];
-  for (const step of steps) {
-    const strike = Number((Math.floor((spot * step) / round + 1e-9) * round).toFixed(dp));
-    if (!(strike > 0) || strike >= spot) dropped.push({ step, strike, why: 'not below spot' });
-    else if (out.includes(strike)) dropped.push({ step, strike, why: 'duplicate after rounding' });
-    else out.push(strike);
-  }
-  return { strikes: out.sort((a, b) => b - a), dropped };
-}
+// cleanStep and ladderStrikes live in agent/src/ladder.mjs, shared with the bot.
+export { cleanStep, ladderStrikes };
 
 const num = (k, d) => { const n = Number(args[k] ?? d); if (!Number.isFinite(n)) throw new Error(`--${k} must be a number`); return n; };
 

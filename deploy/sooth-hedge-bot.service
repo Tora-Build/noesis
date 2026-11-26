@@ -1,0 +1,22 @@
+[Unit]
+Description=Sooth Hedge bot (settler, agent, creator)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zak
+WorkingDirectory=/home/zak/sooth-hedge/agent
+EnvironmentFile=/home/zak/sooth-hedge.env
+ExecStart=/usr/bin/node bot.mjs
+Restart=always
+RestartSec=10
+KillSignal=SIGTERM
+TimeoutStopSec=120
+StandardOutput=append:/home/zak/sooth-hedge-bot.log
+StandardError=append:/home/zak/sooth-hedge-bot.log
+MemoryMax=400M
+CPUQuota=30%
+
+[Install]
+WantedBy=multi-user.target
