@@ -145,12 +145,13 @@ function assetOf(t, c) {
   return t.source === 0 ? ATLAS_IDS[parseInt(t.feedId, 16)] ?? `Atlas #${parseInt(t.feedId, 16)}` : AGGREGATORS[t.feed.toLowerCase()] ?? short(t.feed);
 }
 
-async function fetchReport(market) {
+async function fetchReport(market, bust = false) {
   try {
-    const r = await fetch(`reports/${market.toLowerCase()}.json`, { cache: 'no-store' });
+    const r = await fetch(`reports/${market.toLowerCase()}.json${bust ? `?t=${Date.now()}` : ''}`, { cache: 'no-store' });
     return r.ok ? await r.json() : null;
   } catch { return null; }
 }
+const REPORT_TTL = 300_000; // reports change every 30 min; look again every 5 min
 
 async function readMarket(c) {
   const a = c.market;
@@ -174,9 +175,13 @@ async function readMarket(c) {
     phase: Number(st.phase), outcome: Number(st.outcome), vetoEndsAt: Number(st.vetoEndsAt),
     deadline: Number(deadline), settled, open, openedAt: Number(opened),
     yes: amm ? wad(amm[2]) : null, qYes: amm?.[0], qNo: amm?.[1],
-    report: prev?.report, pos: prev?.pos, observed: prev?.observed,
+    report: prev?.report, reportAt: prev?.reportAt, pos: prev?.pos, observed: prev?.observed,
   };
-  if (m.report === undefined) m.report = await fetchReport(a);
+  if (m.report === undefined || Date.now() - (m.reportAt ?? 0) > REPORT_TTL) {
+    const r = await fetchReport(a, m.report !== undefined);
+    if (r || m.report === undefined) m.report = r;
+    m.reportAt = Date.now();
+  }
   return m;
 }
 
@@ -383,12 +388,28 @@ function renderAll() {
   renderLadder();
   renderTrader();
   renderAgent();
+  renderIntel();
+  renderOracle();
   renderRule();
   renderSettled();
   renderMine();
-  renderPaths();
+  renderChances();
+  syncLevelInput();
   renderPortfolio();
   renderLive();
+}
+
+// Everything that follows the selected level: one place, so the panels never drift apart.
+function renderSel() {
+  renderPlan();
+  renderLadder();
+  renderTrader();
+  renderAgent();
+  renderIntel();
+  renderOracle();
+  renderRule();
+  renderChances();
+  syncLevelInput();
 }
 
 function pickDefaults() {
@@ -412,7 +433,8 @@ function pickDefaults() {
 function renderSegs() {
   const radio = (name, v, label, on, title = '') => `<label${title ? ` title="${esc(title)}"` : ''}><input type="radio" name="${name}" value="${esc(v)}"${on ? ' checked' : ''}><span>${esc(label)}</span></label>`;
   const a = S.assets ?? [];
-  const ah = a.length ? a.map((x) => radio('asset', x, x, x === S.asset)).join('') : '<span class="seg-empty"><span class="skel"></span></span>';
+  const srcOf = (x) => assetPrice(x)?.source;
+  const ah = a.length ? a.map((x) => `<label title="${esc(`${x}, settled by ${SRC_LONG[srcOf(x)] ?? 'its feed'}`)}"><input type="radio" name="asset" value="${esc(x)}"${x === S.asset ? ' checked' : ''}><span>${esc(x)}${srcOf(x) != null ? ` <i class="src-m src-${srcOf(x) === 0 ? 'atlas' : 'cl'}">${esc(SRC[srcOf(x)])}</i>` : ''}</span></label>`).join('') : '<span class="seg-empty"><span class="skel"></span></span>';
   if ($('#assetSeg').innerHTML !== ah) $('#assetSeg').innerHTML = ah;
   const ends = S.asset ? endsOf(S.asset) : [];
   const eh = ends.length ? ends.map((t) => radio('end', t, endLabel(t), t === S.end, `${when(t)}`)).join('') : '<span class="seg-empty"><span class="skel"></span></span>';
@@ -433,7 +455,7 @@ function buildPlan() {
   const stair = legs.length > 1;
   let payout;
   if (S.cover != null) {
-    if (f.strike >= spot) return { err: `${S.asset} is already at or below ${usd(f.strike)}. Drag the floor lower.`, f, spot };
+    if (f.strike >= spot) return { err: `${S.asset} is already at or below ${usd(f.strike)}. Pick a lower level.`, f, spot };
     payout = S.cover * (spot - f.strike);
   } else payout = S.amount;
   if (!(payout > 0)) return { err: 'Enter an amount.', f, spot };
@@ -531,7 +553,7 @@ function renderReadout(p, state) {
   if (legs) {
     setNum(pay, p.payout, money);
     const low = legs.at(-1).m.strike;
-    $('#roPaySub').textContent = `if ${S.asset} ends at or below ${usd(low)} on ${when(f.deadline)}${p.stair ? '. Each level above it pays a part.' : ''}`;
+    $('#roPaySub').textContent = `if ${S.asset} is at or below ${usd(low)} at the deadline, ${when(f.deadline)}${p.stair ? '. Each level above it pays a part.' : ''}`;
   } else {
     setNum(pay, null);
     $('#roPaySub').textContent = p?.err ?? '';
@@ -540,10 +562,12 @@ function renderReadout(p, state) {
   if (state === 'ok') setNum(cost, wad(p.net), (n) => usd(n));
   else if (state === 'loading' && legs) { if (!cost.dataset.v) cost.innerHTML = '<span class="skel" aria-label="Getting a live quote"></span>'; }
   else setNum(cost, null);
-  const top = legs?.[0]?.m;
-  const ch = oneIn(top?.yes);
-  const cc = oneIn(cournotOf(top));
-  $('#roChance').textContent = ch ? `The market says ${ch} it pays.${cc ? ` Cournot says ${cc}.` : ''}` : '\u00a0';
+  const sm = f ?? S.markets.get(S.sel);
+  const ch = oneIn(sm?.yes);
+  $('#roChance').textContent = ch ? `At ${usd(sm.strike)}, the market says ${ch} it pays.` : '\u00a0';
+  $('#roMkt').textContent = sm?.yes != null ? `${cents(sm.yes)} per $1` : '-';
+  const fe = fairOf(sm);
+  $('#roAg').textContent = fe != null ? `${pct(fe)} chance` : 'No report';
   // Staircase legs.
   const ol = $('#legs');
   ol.hidden = !p?.stair;
@@ -598,7 +622,7 @@ function drawChart() {
   }
   if (!S.markets.size || !ap || !lv.length) {
     CH = null;
-    svg.innerHTML = '<title id="svgTitle">Price chart with a floor line</title>';
+    svg.innerHTML = '<title id="svgTitle">Price chart with a protection level line</title>';
     msg.hidden = false;
     msg.innerHTML = !S.markets.size ? '<span class="skel skel-w"></span>' : !ap ? 'No feed price for this asset.' : 'No open levels for this end time. Pick another one.';
     $('#chartCap').textContent = '';
@@ -627,7 +651,7 @@ function drawChart() {
   CH = { W, H, y, inv, xp1, xq0, xq1, padT, padB, lv, ap };
 
   const o = [];
-  o.push('<title id="svgTitle">Price chart with a floor line</title>');
+  o.push('<title id="svgTitle">Price chart with a protection level line</title>');
   o.push(`<defs><clipPath id="clipAll"><rect x="0" y="${padT - 6}" width="${W}" height="${H - padT - padB + 6}"/></clipPath></defs>`);
   o.push(`<line class="frame" x1="${xq0 - gap / 2}" x2="${xq0 - gap / 2}" y1="${padT - 6}" y2="${H - padB}"/>`);
   o.push(`<text class="ax" x="${xq0 + 2}" y="${padT - 6}">Payout</text>`);
@@ -656,7 +680,7 @@ function drawChart() {
   o.push(`<text class="now-t" x="${xp1 + labW - 6}" y="${yN - 6}" text-anchor="end">now</text>`);
   // The floor line: a slider.
   o.push(`<rect class="hit" x="0" y="0" width="${W}" height="${H}"/>`);
-  o.push(`<g id="floorG" class="floor" role="slider" tabindex="0" aria-orientation="vertical" aria-label="Floor price">
+  o.push(`<g id="floorG" class="floor" role="slider" tabindex="0" aria-orientation="vertical" aria-label="Protection level">
     <line class="fl-halo" x1="0" x2="${xq1}" y1="0" y2="0"/>
     <line class="fl-edge" x1="0" x2="${xq1}" y1="0" y2="0"/>
     <line class="fl" x1="0" x2="${xq1}" y1="0" y2="0"/>
@@ -723,20 +747,15 @@ function updateAria() {
   g.setAttribute('aria-valuenow', String(m.strike));
   const cost = S.quote && S.quote.f === p?.f && S.quote.legs?.length === p?.legs?.length ? `, costs ${usd(wad(S.quote.net))}` : '';
   g.setAttribute('aria-valuetext', p?.legs
-    ? `Floor ${usd(m.strike)}. Pays ${p.stair ? 'up to ' : ''}${money(p.payout)} if ${S.asset} ends at or below it on ${when(m.deadline)}${cost}.`
-    : `Floor ${usd(m.strike)}.`);
+    ? `Level ${usd(m.strike)}. Pays ${p.stair ? 'up to ' : ''}${money(p.payout)} if ${S.asset} ends at or below it on ${when(m.deadline)}${cost}.`
+    : `Level ${usd(m.strike)}.`);
 }
 
 function setFloor(addr, animate = true) {
   if (!addr || addr === S.sel) return;
   S.sel = addr;
   placeFloor(animate);
-  renderPlan();
-  renderLadder();
-  renderTrader();
-  renderAgent();
-  renderRule();
-  renderPaths();
+  renderSel();
 }
 
 function stepFloor(dir) {
@@ -784,6 +803,7 @@ function renderLadder() {
   const ap = S.asset && assetPrice(S.asset);
   const dls = [...new Set(ms.map((m) => m.deadline))];
   $('#lAsset').textContent = S.asset ?? '-';
+  $('#lSrc').innerHTML = ap ? srcBadge(ap.source) : '';
   $('#lWhen').textContent = dls.length === 1 ? `Ends ${when(dls[0])}` : dls.length ? `${dls.length} end times` : '';
   if (!ms.length) { tb.innerHTML = `<tr><td colspan="7" class="empty">${S.markets.size ? 'No open levels for this asset.' : '<span class="skel skel-w"></span>'}</td></tr>`; return; }
   tb.innerHTML = ms.map((m) => {
@@ -828,81 +848,181 @@ async function traderQuote() {
   } catch (e) { if (seq === tSeq) $('#tQuote').textContent = `no quote: ${humanError(e)}`; }
 }
 
-// Plain words for where the volatility came from. Honest: a default is a guess, not data.
-function sigmaText(c) {
-  if (c.sigmaSource === 'realized_1d_candles') return `realized, ${num(c.candles?.count) ?? 30} daily CMC DEX candles`;
-  if (c.sigmaSource === 'cmc_price_changes') return 'from CMC 24h to 90d changes, blended with a prior';
-  if (c.sigmaSource === 'default') return 'fixed default, no CMC candles';
-  return c.sigmaSource ? String(c.sigmaSource) : '';
+// ── Shared bits for the report panels ───────────────────────────────
+const IMPL_CMC = 'https://github.com/Tora-Build/noesis/blob/main/agent/src/cmc.mjs';
+const IMPL_ADJ = 'https://github.com/Tora-Build/noesis/blob/main/contracts/src/PriceFeedAdjudicator.sol';
+// Small chances stay honest: 1e-9 shows as "under 0.1%", not 0.0%.
+const pctS = (p) => (p != null && p > 0 && p < 0.0005 ? 'under 0.1%' : pct(p));
+const reportTs = (r) => { const t = Date.parse(r?.generatedAt ?? ''); return Number.isFinite(t) ? t / 1000 : null; };
+const reportWhen = (r) => { const t = reportTs(r); return t ? `${when(t)}, ${ago(t)}` : 'time unknown'; };
+const big = (n) => (n == null ? '-' : n >= 1e12 ? `$${(n / 1e12).toFixed(2)}T` : n >= 1e9 ? `$${(n / 1e9).toFixed(2)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : usd(n, 0));
+const TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: 'UTC' });
+const hms = (iso) => { const t = Date.parse(iso ?? ''); return Number.isFinite(t) ? `${TIME_FMT.format(new Date(t))} UTC` : '-'; };
+const srcBadge = (source) => `<span class="src-b src-${source === 0 ? 'atlas' : 'cl'}">${esc(SRC_LONG[source] ?? 'Feed')}</span>`;
+const metric = (k, v, extra = '', meter = null) => `<div class="metric"><dt>${esc(k)}</dt><dd>${esc(v)}${extra ? `<small>${esc(extra)}</small>` : ''}</dd>${num(meter) != null ? `<div class="meter" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, meter))}%"></i></div>` : ''}</div>`;
+
+// Volatility: what the agent used and how. Never claims candles: the CMC free plan has none.
+function volText(c) {
+  const sd = c.sigmaDetail, sig = num(c.sigma);
+  if (sd && num(sd.cmc) != null && num(sd.prior) != null) {
+    return {
+      parts: `CMC estimate ${pct(sd.cmc, 0)}, prior ${pct(sd.prior, 0)}, blended ${pct(sig, 0)}. Blend = √((CMC² + prior²) / 2).`,
+      how: 'From CMC price changes (1h to 90d windows); the free plan has no candles.',
+    };
+  }
+  if (c.sigmaSource === 'default') return { parts: `Prior only: ${pct(sig, 0)}.`, how: 'CMC gave too few price changes, so the agent used the prior.' };
+  if (c.sigmaSource === 'cmc_price_changes') return { parts: `Blended value ${pct(sig, 0)}.`, how: 'From CMC price changes blended with a prior. This report does not list the two parts.' };
+  return { parts: sig != null ? '' : 'No value in this report.', how: 'This report is from an older agent version. It does not list how the value was made.' };
 }
 
+// The chain from inputs to price, with the real weights from the report.
+function chainText(r) {
+  const d = r.decision ?? {}, c = r.inputs?.cmc ?? {}, p = d.params ?? {};
+  const sig = num(c.sigma), pm = num(d.pModel) ?? num(r.inputs?.model?.pModel), pc = num(d.pCournot), ps = num(d.pStar);
+  const w = num(p.cournotWeight);
+  const parts = [`volatility ${sig != null ? pct(sig, 0) : '-'}`, `model chance ${pctS(pm)}`];
+  if (pc != null) parts.push(`Cournot ${pctS(pc)}`);
+  parts.push(`fair price ${pctS(ps ?? pm)}`);
+  const how = pc != null && w != null
+    ? `Fair = ${w} × Cournot + ${+(1 - w).toFixed(2)} × model = ${w} × ${pctS(pc)} + ${+(1 - w).toFixed(2)} × ${pctS(pm)}.`
+    : `No Cournot chance${r.inputs?.cournot?.state ? ` (${r.inputs.cournot.state})` : ''}, so fair = model chance.${w != null ? ` Cournot weight when present: ${w}.` : ''}`;
+  return { line: parts.join(' → '), how };
+}
+
+// ── Market intelligence (CoinMarketCap), from the selected level's report ──
+function renderIntel() {
+  const m = S.markets.get(S.sel), r = m?.report, c = r?.inputs?.cmc;
+  const body = $('#inBody');
+  if (!r || !c) {
+    $('#inWhen').textContent = '';
+    body.innerHTML = `<p class="empty">${m ? 'No CoinMarketCap data for this level yet.' : 'Pick a level.'}</p><p class="small">${link(IMPL_CMC, 'Implementation')}</p>`;
+    return;
+  }
+  const q = c.quote ?? {};
+  $('#inWhen').textContent = `CoinMarketCap · ${q.symbol ?? r.asset ?? m.asset}`;
+  const price = num(q.price) ?? num(c.spot), feed = num(r.inputs?.spot);
+  const div = price != null && feed ? (price / feed - 1) * 100 : null;
+  const fg = c.fearGreed ?? {}, fgv = num(fg.value), g = c.global ?? {};
+  const cells = [
+    metric('CMC price', price != null ? usd(price) : '-', div != null ? `${signed(div)} vs feed` : ''),
+    num(q.volume24h) != null ? metric('24h volume', big(q.volume24h)) : '',
+    num(q.marketCap) != null ? metric('Market cap', big(q.marketCap)) : '',
+    metric('Fear and Greed', fgv ?? '-', typeof fg.classification === 'string' ? fg.classification : '', fgv),
+    metric('Crypto market cap', big(num(g.totalMarketCap)), num(g.marketCapChange24hPct) != null ? `${signed(g.marketCapChange24hPct)} 24h` : ''),
+    metric('BTC dominance', num(g.btcDominance) != null ? `${g.btcDominance.toFixed(1)}%` : '-'),
+  ].filter(Boolean).join('');
+  const ch = [['1h', c.pct1h], ['24h', c.pct24h], ['7d', c.pct7d], ['30d', c.pct30d], ['60d', c.pct60d], ['90d', c.pct90d]].filter(([, v]) => num(v) != null);
+  const v = volText(c), chain = chainText(r);
+  const calls = Array.isArray(c.calls) ? c.calls : [];
+  const errs = Array.isArray(c.errors) ? c.errors.filter(Boolean) : [];
+  body.innerHTML = `
+    <dl class="metrics">${cells}</dl>
+    ${ch.length ? `<div class="chg"><p class="sub-h">Price change (CMC)</p><dl class="chg-l">${ch.map(([k, x]) => `<div><dt>${k}</dt><dd class="mono ${x < 0 ? 'neg' : ''}">${signed(x)}</dd></div>`).join('')}</dl></div>` : ''}
+    <div class="vol">
+      <p class="sub-h">Volatility used</p>
+      <p class="vol-v"><b class="mono">${num(c.sigma) != null ? `${pct(c.sigma, 0)} a year` : '-'}</b> ${esc(v.parts)}</p>
+      <p class="small muted">${esc(v.how)}</p>
+    </div>
+    <p class="sub-h">From inputs to price</p>
+    <p class="blend">${esc(chain.line)}</p>
+    <p class="small muted">${esc(chain.how)}</p>
+    <div class="api">
+      <p class="sub-h">API log</p>
+      ${calls.length ? `<ol class="api-l">${calls.map((x) => `<li><span class="mono api-t">${esc(hms(x?.at))}</span><code>${esc(x?.path ?? '-')}</code><span class="api-s${Number(x?.status) === 200 ? ' ok' : ''}">${esc(x?.status ?? '-')}</span></li>`).join('')}</ol>` : '<p class="small muted">No calls listed in this report.</p>'}
+      ${errs.length ? `<p class="small">Errors: ${esc(errs.map((e) => (typeof e === 'string' ? e : e?.message ?? JSON.stringify(e))).join('; '))}</p>` : ''}
+      <p class="small muted">Report made ${esc(reportWhen(r))}. The CMC key stays on the server. This page reads only the saved report.</p>
+      <p class="small">${link(IMPL_CMC, 'Implementation')}</p>
+    </div>`;
+}
+
+// ── Oracle: the feed that settles the selected level ────────────────
+function oracleStatus(m) {
+  const s = settleState(m);
+  if (s.kind === 'open') return ['', 'Open'];
+  if (s.kind === 'settled') return ['done', m.outcome === 2 ? 'Settled void' : `Settled ${OUTCOME[m.outcome] ?? ''}`];
+  return ['wait', 'Waiting for settlement'];
+}
+function renderOracle() {
+  const m = S.markets.get(S.sel), body = $('#orBody');
+  if (!m) { body.innerHTML = `<p class="empty">${S.markets.size ? 'Pick a level.' : '<span class="skel skel-w"></span>'}</p>`; return; }
+  const id = parseInt(m.feedId, 16);
+  const [cls, label] = oracleStatus(m);
+  const o = m.observed;
+  const age = m.priceTs ? S.now - m.priceTs : null;
+  body.innerHTML = `
+    <div class="or-top">${srcBadge(m.source)}<span class="status ${cls}">${esc(label)}</span></div>
+    <dl class="kv or-kv small">
+      <dt>Feed contract</dt><dd>${link(addrUrl(m.feed), short(m.feed))}</dd>
+      ${m.source === 0 ? `<dt>Feed id</dt><dd class="mono">${esc(String(id))} (${esc(m.feedId)})</dd><dt>Read</dt><dd><code>fetch(bytes4 feedId)</code>, 18 decimals</dd>` : '<dt>Read</dt><dd><code>latestRoundData()</code></dd>'}
+      <dt>Live price</dt><dd class="mono">${m.price != null ? esc(usd(m.price)) : '-'}</dd>
+      <dt>Updated</dt><dd>${m.priceTs ? `${esc(when(m.priceTs))}, ${esc(ago(m.priceTs))}` : '-'}${age != null && age > 900 ? ' <span class="muted">(stock feeds pause when the market is closed)</span>' : ''}</dd>
+      <dt>Read at</dt><dd>${S.block != null ? `block #${esc(S.block.toLocaleString('en-US'))}` : '-'}</dd>
+      <dt>Network</dt><dd>BNB Smart Chain mainnet</dd>
+      <dt>Level</dt><dd>${esc(usd(m.strike))}, at the deadline ${esc(when(m.deadline))}</dd>
+      ${o ? `<dt>Price used</dt><dd class="mono">${esc(usd(o.price))} <span class="muted">at ${esc(when(o.ts))}</span></dd><dt>Settlement tx</dt><dd>${link(txUrl(o.tx), short(o.tx))}</dd>` : ''}
+    </dl>
+    <p class="or-rule">At the deadline, anyone can call settle; the contract reads this feed; the price must be at most ${esc(String(m.maxDelay))} s old; no person can change the result.</p>
+    <p class="small">${link(IMPL_ADJ, 'Implementation')} · ${link(addrUrl(cfg.adjudicator), 'Adjudicator contract')}</p>`;
+}
+
+// ── Risk agent ───────────────────────────────────────────────────────
+const ACTION = { BUY_YES: ['buy', 'Buy cover'], BUY_NO: ['sell', 'Sell cover'], HOLD: ['', 'Hold'] };
+function agentReasons(r) {
+  const d = r.decision ?? {}, p = d.params ?? {}, inp = r.inputs ?? {};
+  const out = [];
+  const e = num(d.edge), th = num(p.edgeThreshold);
+  if (e != null) out.push(`Edge ${signed(e * 100, 1)}: agent estimate ${pct(num(d.pStar))} minus market price ${pct(num(d.pSooth))}. ${th != null ? `The threshold is ${pct(th)}, so the edge is ${Math.abs(e) > th ? 'outside it: a trade is allowed' : 'inside it: no trade'}.` : ''}`);
+  const risk = num(d.risk) ?? num(inp.model?.risk?.score), cap = num(p.riskCap);
+  if (risk != null) out.push(`Risk score ${Math.round(risk)} of 100. ${cap != null ? `The cap is ${cap}, so the risk is ${risk >= cap ? 'at or above the cap: no trade' : 'under the cap'}.` : ''}`);
+  const pc = num(d.pCournot);
+  out.push(pc != null ? `Cournot used: ${pct(pc)}, weight ${num(p.cournotWeight) ?? '-'}.` : `Cournot not used${inp.cournot?.state ? ` (${inp.cournot.state})` : ''}.`);
+  if ((d.alerts ?? []).some((a) => (a?.code ?? a) === 'FEED_STALE')) out.push('The feed is old, so the agent holds. Atlas stock feeds pause when the stock market is closed.');
+  if (num(d.sizeUsd)) out.push(`Size ${usd(d.sizeUsd)}${num(p.bankroll) ? ` of a ${usd(p.bankroll, 0)} bankroll` : ''}.`);
+  return out;
+}
 function renderAgent() {
   const m = S.markets.get(S.sel);
   const r = m?.report;
   const body = $('#agBody');
+  $('#agRefresh').disabled = !m;
   if (!r) {
     $('#agWhen').textContent = '';
     body.innerHTML = `<p class="empty">${m ? 'No agent report for this level yet.' : 'Pick a level to see the agent.'}</p>`;
     return;
   }
-  const d = r.decision ?? {}, inp = r.inputs ?? {}, c = inp.cmc ?? {}, p = d.params ?? {};
-  const calls = Array.isArray(c.calls) ? c.calls : [];
+  const d = r.decision ?? {};
   const block = num(r.proof?.block);
-  $('#agWhen').textContent = [
-    `${usd(m.strike)} level`,
-    r.generatedAt ? when(Date.parse(r.generatedAt) / 1000) : '',
-    r.mode === 'dry-run' ? 'dry run' : '',
-  ].filter(Boolean).join(' · ');
-  const stale = (d.alerts ?? []).some((a) => (a?.code ?? a) === 'FEED_STALE');
-  let say;
-  if (d.action === 'BUY_YES') say = 'Cover is cheap. The agent buys.';
-  else if (d.action === 'BUY_NO') say = 'Cover is dear. The agent sells.';
-  else if (stale) say = 'The feed is old. The agent holds.';
-  else if (d.action === 'HOLD' && d.preImpact) say = 'The trade would use up the edge. The agent holds.';
-  else if (d.action === 'HOLD') say = 'The price is fair. The agent holds.';
-  else say = 'No decision in this report.';
-  const fg = c.fearGreed ?? {};
-  const fgv = num(fg.value);
-  const risk = num(d.risk) ?? num(inp.model?.risk?.score);
-  const cspot = num(c.spot), fspot = num(inp.spot);
-  const div = cspot && fspot ? (cspot / fspot - 1) * 100 : null;
-  const g = c.global ?? {};
-  const dom = num(g.btcDominance), capChg = num(g.marketCapChange24hPct);
-  // Every value goes through esc(). Numbers are formatted first, so a bad report shows "-".
-  const metric = (k, v, extra = '', meter = null) => `<div class="metric"><dt>${esc(k)}</dt><dd>${esc(v)}${extra ? `<small>${esc(extra)}</small>` : ''}</dd>${num(meter) != null ? `<div class="meter" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, meter))}%"></i></div>` : ''}</div>`;
-  const w = num(p.cournotWeight) ?? 0.6;
-  const blend = num(d.pCournot) != null
-    ? `fair = ${w} × Cournot ${pct(num(d.pCournot))} + ${(1 - w).toFixed(1)} × model ${pct(num(d.pModel))} = ${pct(num(d.pStar))}`
-    : `fair = model ${pct(num(d.pModel))}  (Cournot: ${inp.cournot?.state ?? 'none'})`;
+  $('#agWhen').textContent = `${usd(m.strike)} level${r.mode === 'dry-run' ? ' · dry run' : ''}`;
+  const [cls, label] = ACTION[d.action] ?? ['', 'No decision'];
   const sent = [r.tx?.sent?.trade, r.tx?.hash].find(isHash);
   const ev = Array.isArray(r.evidence?.lines) ? r.evidence.lines : [];
   body.innerHTML = `
-    <p class="say">${esc(say)}</p>
+    <p class="say"><span class="pill big ${cls}">${esc(label)}</span></p>
+    <ul class="why">${agentReasons(r).map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
     <div class="ag-nums">
-      <div><span class="ag-k">Market</span><span class="ag-v mono">${cents(num(d.pSooth) ?? m.yes)}</span></div>
-      <div><span class="ag-k">Fair</span><span class="ag-v mono">${cents(num(d.pStar) ?? num(d.pModel))}</span></div>
-      ${cournotOf(m) != null ? `<div><span class="ag-k">Cournot</span><span class="ag-v mono">${pct(cournotOf(m))}</span></div>` : ''}
+      <div><span class="ag-k">Market price</span><span class="ag-v mono">${cents(num(d.pSooth) ?? m.yes)}</span></div>
+      <div><span class="ag-k">Agent estimate</span><span class="ag-v mono">${pct(num(d.pStar) ?? num(d.pModel))}</span></div>
       <div><span class="ag-k">Edge</span><span class="ag-v mono">${num(d.edge) != null ? signed(d.edge * 100, 1) : '-'}</span></div>
     </div>
-    <details class="more">
-      <summary>Details: agent inputs</summary>
-      <dl class="metrics">
-        ${metric('Fear & Greed (CMC)', fgv ?? '-', typeof fg.classification === 'string' ? fg.classification : '', fgv)}
-        ${metric('Volatility, yearly', num(c.sigma) != null ? pct(c.sigma, 0) : '-', sigmaText(c))}
-        ${metric('Risk score', risk != null ? `${Math.round(risk)}/100` : '-', risk != null && risk >= (num(p.highRisk) ?? 70) ? 'high' : '', risk)}
-        ${metric('CMC vs feed', cspot != null ? usd(cspot) : '-', div != null ? `${signed(div)} from feed` : '')}
-        ${metric('BTC dominance (CMC)', dom != null ? `${dom.toFixed(1)}%` : '-', '')}
-        ${metric('Crypto cap, 24h', capChg != null ? signed(capChg) : '-', 'CMC')}
-        ${metric('Size', num(d.sizeUsd) ? usd(d.sizeUsd) : '$0', num(p.bankroll) ? `of ${usd(p.bankroll, 0)}` : '')}
-        ${metric('Report block', block != null ? `#${block.toLocaleString('en-US')}` : '-', '')}
-      </dl>
-      <p class="blend">${esc(blend)}</p>
-      ${d.reason ? `<p class="small muted">${esc(d.reason)}${stale ? ' Atlas stock feeds pause when the stock market is closed.' : ''}</p>` : ''}
+    <p class="small muted ag-time">Report made ${esc(reportWhen(r))}${block != null ? `, block #${esc(block.toLocaleString('en-US'))}` : ''}.</p>
+    <p class="small">${sent ? `Last trade: ${link(txUrl(sent), short(sent))}` : r.tx ? 'Trade built, not sent.' : 'No trade in this report.'}</p>
+    ${(d.alerts ?? []).length || ev.length || d.reason ? `<details class="more">
+      <summary>Details: agent notes</summary>
+      ${d.reason ? `<p class="small muted">Agent note: ${esc(d.reason)}</p>` : ''}
       ${(d.alerts ?? []).length ? `<ul class="alerts">${d.alerts.map((a) => `<li><b>${esc(a?.code ?? '')}</b>${esc(a?.message ?? a)}</li>`).join('')}</ul>` : ''}
-      ${sent ? `<p class="small">Agent trade: ${link(txUrl(sent), short(sent))}</p>` : ''}
-      ${calls.length ? `<p class="small muted">CMC calls (${esc(c.mode ?? '')}): ${calls.map((x) => `<span class="mono">${esc(x?.path ?? '')} ${esc(x?.status ?? '')}</span>`).join(', ')}</p>` : ''}
       ${ev.length ? `<p class="small sub-h">Cournot evidence</p><ul class="ev">${ev.map((e) => typeof e === 'string' ? `<li>${esc(e)}</li>` : `<li>${e?.url ? link(e.url, e.source ?? e.title ?? e.url) : esc(e?.source ?? e?.text ?? '')}${e?.summary ? `: ${esc(e.summary)}` : ''}</li>`).join('')}</ul>` : ''}
-    </details>`;
+    </details>` : ''}`;
+}
+
+async function refreshReport() {
+  const m = S.markets.get(S.sel), b = $('#agRefresh');
+  if (!m) return;
+  b.disabled = true; $('#agRefMsg').textContent = 'Loading the report.';
+  const r = await fetchReport(m.addr, true);
+  if (r) { m.report = r; m.reportAt = Date.now(); }
+  $('#agRefMsg').textContent = r ? `Report loaded. Made ${reportWhen(r)}.` : 'Could not load the report.';
+  b.disabled = false;
+  renderSel();
 }
 
 function renderSettled() {
@@ -920,7 +1040,7 @@ function renderSettled() {
     const out = m.settled || m.phase >= PH.RESOLVED ? m.outcome : null;
     let line = '';
     if (o) {
-      const res = out === 1 ? 'the level was hit. Each $1 of cover pays $1.' : out === 0 ? `the price stayed ${isBelow(m.kind) ? 'above' : 'below'} ${usd(m.strike)}. Cover did not pay.` : 'no price in time. Each share pays $0.50.';
+      const res = out === 1 ? `the price ended at or below ${usd(m.strike)}. Each $1 of cover pays $1.` : out === 0 ? `the price stayed ${isBelow(m.kind) ? 'above' : 'below'} ${usd(m.strike)}. Cover did not pay.` : 'no price in time. Each share pays $0.50.';
       line = `${SRC[m.source]} price <span class="mono">${usd(o.price)}</span> at ${when(o.ts)}: ${res}`;
     } else if (out != null) line = `Result <b>${OUTCOME[out]}</b>.`;
     else if (s.kind === 'propose') line = touchHit(m) ? `${SRC[m.source]} price <span class="mono">${usd(m.price)}</span> touched the level.` : `Time is over. Last ${SRC[m.source]} price <span class="mono">${usd(m.price)}</span>.`;
@@ -945,71 +1065,69 @@ function renderSettled() {
   }).join('');
 }
 
+// Status of a position, from data the page already has: phase, outcome, settled flag, shares.
+function coverStatus(m) {
+  if (live(m)) return ['', 'Open'];
+  if (!m.settled) {
+    // The feed result is in but not final yet.
+    if ((m.phase === PH.RESOLVED || m.phase === PH.ATTESTED) && m.outcome < 2) return m.outcome === 1 ? ['won', 'Won'] : ['lost', 'Lost'];
+    return ['wait', 'Waiting'];
+  }
+  if (m.outcome === 1 || m.outcome === 2) return ['claim', 'Claim'];
+  return ['lost', 'Lost'];
+}
 function renderMine() {
-  const rows = [...S.markets.values()].filter((m) => m.pos?.yes > 0 && !m.settled && isBelow(m.kind));
+  const rows = [...S.markets.values()].filter((m) => m.pos?.yes > 0 && isBelow(m.kind));
   $('#mine').hidden = !rows.length;
   rows.sort((a, b) => a.deadline - b.deadline || b.strike - a.strike);
-  // Compact rows: payout | asset and level | end. More than 3 go behind a toggle so the page stays short.
-  const li = (m) => `<li title="${esc(ifText(m))}"><span class="mono mine-amt">${usd(m.pos.yes)}</span><span class="mine-what">${esc(m.asset)} ≤ ${usd(m.strike)}</span><span class="mine-when muted">${esc(endLabel(m.deadline))}</span></li>`;
+  // Compact rows: payout | asset and level | end | status. More than 3 go behind a toggle.
+  const li = (m) => {
+    const [cls, label] = coverStatus(m);
+    const pay = m.outcome === 2 ? m.pos.yes / 2 : m.pos.yes;
+    const act = cls === 'claim' ? `<button class="btn btn-ink btn-sm" data-act="claim" data-m="${esc(m.addr)}">Claim ${esc(usd(pay))}</button>` : `<span class="status ${cls === 'won' ? 'done' : cls === 'lost' ? '' : cls}">${esc(label)}</span>`;
+    return `<li title="${esc(ifText(m))}"><span class="mono mine-amt">${usd(m.pos.yes)}</span><span class="mine-what">${esc(m.asset)} ≤ ${usd(m.strike)}</span><span class="mine-when muted">${esc(endLabel(m.deadline))}</span><span class="mine-st">${act}</span></li>`;
+  };
   const total = rows.reduce((t, m) => t + m.pos.yes, 0);
   $('#mineList').innerHTML = rows.slice(0, 3).map(li).join('')
     + (rows.length > 3 ? `<li class="mine-more"><details><summary>Show all ${rows.length} (pays up to ${usd(total)} in total)</summary><ul class="mine-list">${rows.slice(3).map(li).join('')}</ul></details></li>` : '');
 }
 
-// ── Multi-path outcomes: from the price now to each open level ──────
-// Only real numbers: the feed price, the level, the AMM price (p) and the agent's fair price.
+// ── Chance by level: market price and agent estimate per level ──────
+// Only real numbers: the AMM price (the market's chance) and the agent's fair chance.
+// No paths and no curves: we do not forecast the price.
 function fairOf(m) { return num(m?.report?.decision?.pStar) ?? num(m?.report?.decision?.pModel); }
-const p2 = (p) => (p == null || !Number.isFinite(p) ? '-' : p.toFixed(2));
 
-function renderPaths() {
-  const svg = $('#pathsSvg'), box = $('#pathsPlot'), msg = $('#pathsMsg');
+function renderChances() {
+  const list = $('#chList');
   const ap = S.asset && assetPrice(S.asset), lv = levels();
-  $('#pathsWhen').textContent = S.asset && S.end ? `${S.asset}, ends ${endLabel(S.end)} UTC` : '';
-  if (!S.markets.size || !ap || !lv.length) {
-    svg.innerHTML = '<title id="pathsTitle">Outcome paths</title>';
-    svg.setAttribute('height', '0');
-    msg.hidden = false;
-    msg.innerHTML = !S.markets.size ? '<span class="skel skel-w"></span>' : !ap ? 'No feed price for this asset.' : 'No open levels for this end time.';
-    return;
-  }
-  msg.hidden = true;
-  const W = Math.max(280, Math.round(box.clientWidth || 440));
-  const n = lv.length, rowH = 40;
-  const H = Math.max(260, n * rowH + 72);
-  const labW = W < 400 ? 112 : 136, padT = 20, padB = 32;
-  const x0 = 6, x1 = W - labW - 16;
-  const vals = [ap.price, ...lv.map((m) => m.strike)];
-  let lo = Math.min(...vals), hi = Math.max(...vals);
-  const pad = (hi - lo || ap.price * 0.02) * 0.1; lo -= pad; hi += pad;
-  const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
-  const y0 = y(ap.price);
-  // Labels: at the level, pushed apart so they never overlap.
-  const ys = lv.map((m) => y(m.strike));
-  const ly = [];
-  ys.forEach((v, i) => { ly.push(Math.max(v, i ? ly[i - 1] + rowH : padT)); });
-  const over = (ly.at(-1) ?? 0) - (H - padB + 4);
-  if (over > 0) for (let i = ly.length - 1; i >= 0; i--) ly[i] = Math.min(ly[i] - over, i < ly.length - 1 ? ly[i + 1] - rowH : Infinity);
-  const on = new Set(S.plan?.legs?.map((l) => l.m.addr) ?? [S.sel]);
-  const curve = (yk) => `M${x0},${y0.toFixed(1)}C${(x0 + (x1 - x0) * 0.45).toFixed(1)},${y0.toFixed(1)} ${(x0 + (x1 - x0) * 0.55).toFixed(1)},${yk.toFixed(1)} ${x1},${yk.toFixed(1)}`;
-  const o = [];
-  o.push(`<title id="pathsTitle">${esc(`Paths from ${S.asset} ${usd(ap.price)} now to ${n} level${n > 1 ? 's' : ''} at ${when(S.end)}. `
-    + lv.map((m) => `${usd(m.strike)}: p ${p2(m.yes)}, fair ${p2(fairOf(m))}`).join('; '))}</title>`);
-  o.push(`<line class="mp-base" x1="${x0}" x2="${x1}" y1="${y0}" y2="${y0}"/>`);
-  for (const yk of ys) o.push(`<path class="mp-fan" d="${curve(yk)}L${x1},${y0.toFixed(1)}Z"/>`);
-  lv.forEach((m, i) => o.push(`<path class="mp-l${on.has(m.addr) ? ' on' : ''}" d="${curve(ys[i])}"/>`));
-  lv.forEach((m, i) => {
-    const sel = on.has(m.addr), lx = x1 + 12;
-    if (Math.abs(ly[i] - ys[i]) > 1) o.push(`<path class="mp-l" d="M${x1 + 4},${ys[i].toFixed(1)}L${lx - 4},${ly[i].toFixed(1)}"/>`);
-    o.push(`<circle class="mp-end${sel ? ' on' : ''}" cx="${x1}" cy="${ys[i].toFixed(1)}" r="${sel ? 4.5 : 3.5}"/>`);
-    o.push(`<text class="mp-p" x="${lx}" y="${(ly[i] - 1).toFixed(1)}">p = ${p2(m.yes)}</text>`);
-    o.push(`<text class="mp-f" x="${lx}" y="${(ly[i] + 13).toFixed(1)}">${esc(usd(m.strike, m.strike >= 100 ? 0 : 2))} · fair ${p2(fairOf(m))}</text>`);
-  });
-  o.push(`<circle class="mp-o" cx="${x0}" cy="${y0}" r="4.5"/>`);
-  o.push(`<text class="mp-ax" x="${x0}" y="${y0 < H / 2 ? y0 - 10 : y0 + 18}">${esc(usd(ap.price))} now</text>`);
-  o.push(`<text class="mp-ax" x="${x1}" y="${H - 8}" text-anchor="end">${esc(endLabel(S.end))} UTC</text>`);
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.setAttribute('height', String(H));
-  svg.innerHTML = o.join('');
+  $('#chWhen').textContent = S.asset && S.end ? `${S.asset}, at the deadline ${endLabel(S.end)} UTC` : '';
+  if (!S.markets.size) { list.innerHTML = '<li class="empty"><span class="skel skel-w"></span></li>'; return; }
+  if (!lv.length) { list.innerHTML = `<li class="empty">${ap ? 'No open levels for this end time.' : 'No feed price for this asset.'}</li>`; return; }
+  const legs = new Set(S.plan?.legs?.map((l) => l.m.addr) ?? []);
+  const w = (p) => (p == null ? 0 : Math.max(0, Math.min(100, p * 100)));
+  list.innerHTML = lv.map((m) => {
+    const mk = m.yes, ag = fairOf(m), sel = m.addr === S.sel, leg = legs.has(m.addr);
+    const label = `${usd(m.strike)}: market price ${mk != null ? pct(mk) : 'none'}, agent estimate ${ag != null ? pct(ag) : 'none'}`;
+    return `<li><button type="button" class="ch-row${sel ? ' on' : leg ? ' leg' : ''}" data-m="${esc(m.addr)}" aria-pressed="${sel}" aria-label="${esc(label)}">
+      <span class="ch-l mono">${esc(usd(m.strike, m.strike >= 100 ? 0 : 2))}</span>
+      <span class="ch-track" aria-hidden="true"><i class="ch-bar" style="width:${w(mk).toFixed(1)}%"></i>${ag != null ? `<b class="ch-mk" style="left:${w(ag).toFixed(1)}%"></b>` : ''}</span>
+      <span class="ch-n mono" aria-hidden="true"><span>${mk != null ? pct(mk) : '-'}</span><span class="ch-ag">${ag != null ? pct(ag) : '-'}</span></span>
+    </button></li>`;
+  }).join('');
+}
+
+// The typed level: snaps to a level that has a market, both ways with the drag line.
+function syncLevelInput() {
+  const inp = $('#lvlInput'), m = S.markets.get(S.sel), lv = levels();
+  $('#lvlList').innerHTML = lv.map((x) => `<option value="${esc(String(x.strike))}"></option>`).join('');
+  inp.disabled = !lv.length;
+  if (lv.length) { inp.min = String(lv.at(-1).strike); inp.max = String(lv[0].strike); }
+  if (m && document.activeElement !== inp) inp.value = String(m.strike);
+}
+function snapLevel(v) {
+  const lv = levels();
+  if (!lv.length || !Number.isFinite(v)) return null;
+  return lv.reduce((b, m) => (Math.abs(m.strike - v) < Math.abs(b.strike - v) ? m : b), lv[0]);
 }
 
 // ── Portfolio: what the wallet really holds, valued at the live feed price ──
@@ -1028,7 +1146,7 @@ function renderPortfolio() {
   }
   if (!held.length) {
     $('#folioNote').textContent = '';
-    $('#folioBody').innerHTML = `<p class="folio-none">This wallet holds no ${esc(known.join(', ').replace(/, ([^,]*)$/, ' or $1'))}. You can still set a floor with any amount.</p>`;
+    $('#folioBody').innerHTML = `<p class="folio-none">This wallet holds no ${esc(known.join(', ').replace(/, ([^,]*)$/, ' or $1'))}. You can still buy protection with any amount.</p>`;
     return;
   }
   $('#folioBody').innerHTML = `<ul class="folio-list">${held.map((a) => {
@@ -1170,23 +1288,51 @@ async function openConfirm() {
   const q = { asset: S.asset, deadline: plan.f.deadline, source: plan.f.source, stair: plan.stair, payout: plan.payout, legs: Object.freeze(legs), net, maxCost, fee };
   CF = Object.freeze(q);
   cfDone = new Set();
-  const low = legs.at(-1).strike;
+  const low = legs.at(-1).strike, top = legs[0].strike;
+  const prem = wad(maxCost), quoteNow = wad(net);
   $('#cfWhat').textContent = q.stair
-    ? `You get up to ${money(q.payout)} as ${q.asset} falls to ${usd(low)} by ${when(q.deadline)}. The ${SRC_LONG[q.source]} price settles it.`
-    : `You get ${money(q.payout)} if ${q.asset} ends at or below ${usd(low)} on ${when(q.deadline)}. The ${SRC_LONG[q.source]} price settles it.`;
-  let acc = 0;
-  $('#cfLegs').innerHTML = `<thead><tr><th scope="col">Level</th><th scope="col" class="r">Pays at or below</th><th scope="col" class="r">You pay</th></tr></thead><tbody>${legs.map((l) => { acc += l.sharesNum; return `<tr><td class="mono">${usd(l.strike)}</td><td class="r">${money(acc)}</td><td class="r">${usd(wad(l.net))}</td></tr>`; }).join('')}</tbody>`;
+    ? `You get up to ${money(q.payout)} as ${q.asset} falls to ${usd(low)} at the deadline, ${when(q.deadline)}. Above ${usd(top)} you get $0. The ${SRC_LONG[q.source]} price settles it.`
+    : `You get ${money(q.payout)} if ${q.asset} is at or below ${usd(low)} at the deadline, ${when(q.deadline)}. Above it you get $0. The ${SRC_LONG[q.source]} price settles it.`;
+  // Price impact: the AMM price now against the average price this order pays.
+  const shares = legs.reduce((s, l) => s + l.sharesNum, 0);
+  const pNow = legs.every((l) => l.m.yes != null) ? legs.reduce((s, l) => s + l.sharesNum * l.m.yes, 0) / shares : null;
+  const pAvg = quoteNow / shares;
+  const impact = pNow != null ? `${cents(pNow)} now → ${cents(pAvg)} average per $1 (${pAvg >= pNow ? '+' : '−'}${(Math.abs(pAvg - pNow) * 100).toFixed(1)}¢)${legs.length === 1 ? `, ${cents(wad(legs[0].newPrice))} after your buy` : ''}` : `${cents(pAvg)} average per $1`;
+  $('#cfSum').innerHTML = `
+    <dt>Premium (most you pay)</dt><dd class="total">${usd(prem)} <span class="muted">(quote ${usd(quoteNow)}, ${Number(SLIP_BPS) / 100}% slippage)</span></dd>
+    <dt>Payout</dt><dd>${q.stair ? 'up to ' : ''}${money(q.payout)}</dd>
+    <dt>${legs.length > 1 ? 'Levels' : 'Level'}</dt><dd>${legs.length > 1 ? `${usd(top)} to ${usd(low)}, ${legs.length} levels` : usd(low)}</dd>
+    <dt>Expiry</dt><dd>${when(q.deadline)}, at the deadline</dd>
+    <dt>Price impact</dt><dd>${impact}</dd>
+    <dt>Network fee</dt><dd id="cfGas">Estimating.</dd>`;
+  $('#cfLegs').innerHTML = `<thead><tr><th scope="col">Level</th><th scope="col" class="r">Shares</th><th scope="col" class="r">Cost</th><th scope="col" class="r">Pays if at or below</th></tr></thead><tbody>${legs.map((l) => `<tr><td class="mono">${usd(l.strike)}</td><td class="r">${l.sharesNum.toFixed(2)}</td><td class="r">${usd(wad(l.net))}</td><td class="r">${money(l.sharesNum)}</td></tr>`).join('')}</tbody>${legs.length > 1 ? `<tfoot><tr><th scope="row">Total</th><td class="r">${shares.toFixed(2)}</td><td class="r">${usd(quoteNow)}</td><td class="r">${money(q.payout)}</td></tr></tfoot>` : ''}`;
+  // Scenarios by price zone at the deadline. Payout adds up as each level is crossed.
+  const zones = [[`Above ${usd(top)}`, 0]];
+  let cum = 0;
+  legs.forEach((l, i) => { cum += l.sharesNum; zones.push([legs[i + 1] ? `${usd(legs[i + 1].strike)} < price ≤ ${usd(l.strike)}` : `At or below ${usd(l.strike)}`, cum]); });
+  $('#cfScen').innerHTML = `<thead><tr><th scope="col">Price at the deadline</th><th scope="col" class="r">You get</th><th scope="col" class="r">Net</th></tr></thead><tbody>${zones.map(([k, got]) => `<tr><td>${k}</td><td class="r">${money(got)}</td><td class="r ${got - prem < 0 ? 'neg' : 'pos'}">${usd(got - prem)}</td></tr>`).join('')}</tbody>`;
+  $('#cfScenNote').textContent = `Net = what you get minus the premium (${usd(prem)}, the most you pay). If the order fills at the quote, net is up to ${usd(prem - quoteNow)} better.`;
   $('#cfRows').innerHTML = `
-    <dt>You pay now</dt><dd class="total">${usd(wad(net))}</dd>
-    <dt>Most you pay</dt><dd>${usd(wad(maxCost))} <span class="muted">(${Number(SLIP_BPS) / 100}% slippage${legs.length > 1 ? ', per level' : ''})</span></dd>
     <dt>Fee, included</dt><dd>${usd(wad(fee))}</dd>
     <dt>Limit per order</dt><dd>${usd(MAX_TRADE, 0)} <span class="muted">(this page)</span></dd>
     <dt>Paid in</dt><dd>hUSD-DEMO, demo money</dd>`;
+  estimateGas(CF);
   $('#cfSteps').innerHTML = `${needApprove ? `<li data-s="approve">Allow the Sooth AMM to take up to ${usd(wad(maxCost))} hUSD-DEMO</li>` : ''}${legs.map((l, i) => `<li data-s="buy${i}">Buy the ${usd(l.strike)} level, ${usd(l.sharesNum)}</li>`).join('')}`;
   setMsg('#cfMsg', legs.length > 1 ? `Your wallet asks ${legs.length + (needApprove ? 1 : 0)} times, once per step.` : '');
   $('#cfGo').disabled = false;
   $('#cfGo').textContent = 'Confirm in wallet';
   $('#confirm').showModal();
+}
+
+// Network fee: eth_estimateGas × gas price for each buy. Read only: nothing is sent.
+// Before an approval the estimate fails (no allowance yet); then the wallet shows the fee.
+async function estimateGas(q) {
+  const out = (t) => { if (CF === q && $('#cfGas')) $('#cfGas').textContent = t; };
+  try {
+    const [gp, ...gs] = await Promise.all([pub.getGasPrice(), ...q.legs.map((l) => pub.estimateContractGas({ address: cfg.amm, abi: AMM, functionName: 'tradePositions', args: [l.market, 1, l.shares, l.maxCost], account: S.account }))]);
+    const wei = gs.reduce((s, g) => s + g, 0n) * gp;
+    out(`about ${Number(formatUnits(wei, 18)).toPrecision(2)} BNB (${gs.reduce((s, g) => s + g, 0n).toLocaleString('en-US')} gas at ${Number(formatUnits(gp, 9)).toPrecision(2)} gwei)`);
+  } catch { out('Shown in your wallet.'); }
 }
 
 async function runProtect() {
@@ -1287,7 +1433,7 @@ $('#faucet').onclick = faucet;
 document.querySelectorAll('[data-faucet]').forEach((b) => { b.hidden = !cfg.faucet; b.onclick = faucet; });
 $('#assetSeg').addEventListener('change', (e) => { S.asset = e.target.value; S.end = null; S.sel = null; S.cover = null; renderAll(); });
 $('#endSeg').addEventListener('change', (e) => { S.end = Number(e.target.value); S.sel = null; renderAll(); });
-$('#modeSeg').addEventListener('change', (e) => { S.mode = e.target.value; renderPlan(); renderLadder(); renderRule(); renderPaths(); });
+$('#modeSeg').addEventListener('change', (e) => { S.mode = e.target.value; renderSel(); });
 $('#amt').addEventListener('input', (e) => { S.cover = null; S.amount = Number(e.target.value); renderPlan(); });
 document.querySelectorAll('.chip[data-amt]').forEach((c) => { c.onclick = () => { S.cover = null; S.amount = Number(c.dataset.amt); $('#amt').value = c.dataset.amt; renderPlan(); }; });
 $('#coverBtn').onclick = () => {
@@ -1353,6 +1499,24 @@ document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]');
   if (b) marketAction(b.dataset.act, b.dataset.m, b);
 });
+// Type a level: snaps to the nearest level that has a market. Arrow keys step through levels.
+const lvlInput = $('#lvlInput');
+const takeLevel = (m) => { if (!m) { syncLevelInput(); return; } setFloor(m.addr); lvlInput.value = String(m.strike); };
+lvlInput.addEventListener('keydown', (e) => {
+  const lv = levels(), i = lv.findIndex((m) => m.addr === S.sel);
+  const k = { ArrowUp: -1, ArrowDown: 1, PageUp: -1, PageDown: 1 }[e.key];
+  if (k) { e.preventDefault(); takeLevel(lv[Math.max(0, Math.min(lv.length - 1, i + k))]); }
+  else if (e.key === 'Enter') { e.preventDefault(); takeLevel(snapLevel(Number(lvlInput.value))); }
+});
+lvlInput.addEventListener('change', () => takeLevel(snapLevel(Number(lvlInput.value))));
+lvlInput.addEventListener('blur', () => syncLevelInput());
+$('#chList').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-m]');
+  if (!b) return;
+  setFloor(b.dataset.m);
+  $(`#chList [data-m="${CSS.escape(b.dataset.m)}"]`)?.focus();
+});
+$('#agRefresh').onclick = refreshReport;
 // The wallet client is made here too, so a later send() never meets an account without a wallet.
 window.ethereum?.on?.('accountsChanged', (a) => {
   if (!a?.[0]) { resetWallet(); renderAll(); return; }
@@ -1362,7 +1526,7 @@ window.ethereum?.on?.('accountsChanged', (a) => {
   loadPositions().then(renderAll).catch(() => {});
 });
 window.ethereum?.on?.('chainChanged', () => location.reload());
-let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!drag) { drawChart(); renderPaths(); } }, 120); });
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!drag) drawChart(); }, 120); });
 
 // ── Start ────────────────────────────────────────────────────────────
 async function refresh() {
