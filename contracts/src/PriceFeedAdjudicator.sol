@@ -31,12 +31,18 @@ interface IAggregatorV3 {
  *         Anyone can call settleFromFeed; the adjudicator is its own resolver.
  *
  *         Market kinds (typeConfig.kind):
- *         - CLOSE_ABOVE / CLOSE_BELOW: the first feed price at or after the deadline
- *           decides. It must be read within maxDelay of the deadline, else INVALID.
+ *         - CLOSE_ABOVE / CLOSE_BELOW: the feed price that the first settleFromFeed
+ *           call after the deadline reads decides. That price must be published at or
+ *           after the deadline and no later than deadline + maxDelay, else INVALID.
+ *           Any update inside that window can decide, so keep maxDelay short (a few
+ *           heartbeats, at most MAX_DELAY_CAP) and run a keeper at each deadline.
  *         - TOUCH_ABOVE / TOUCH_BELOW: YES as soon as anyone shows a feed price past
  *           the strike, published after the market opened and before the deadline.
  *           At the deadline with no such proof, NO. A touch between two reads that
  *           nobody submits is missed; keepers read often (Atlas heartbeat is 60 s).
+ *           Touch markets trade until settleFromFeed, so a trader can buy YES and settle
+ *           in one transaction once the feed has crossed. Do not open them with real
+ *           liquidity; the deploy scripts create CLOSE markets only.
  *
  *         Only feeds named at deployment can be used, and they are part of the
  *         frozen profile hash, so a market creator cannot bring a fake feed.
@@ -49,6 +55,8 @@ contract PriceFeedAdjudicator is AdjudicatorBase {
     uint8 public constant KIND_CLOSE_BELOW = 1;
     uint8 public constant KIND_TOUCH_ABOVE = 2;
     uint8 public constant KIND_TOUCH_BELOW = 3;
+    /// @notice Longest allowed read window after the deadline for CLOSE markets.
+    uint64 public constant MAX_DELAY_CAP = 1 hours;
 
     struct Terms {
         uint8 source;
@@ -157,7 +165,9 @@ contract PriceFeedAdjudicator is AdjudicatorBase {
             BadTerms()
         );
         require((t.source == SOURCE_ATLAS_MULTI) == (t.feedId != bytes4(0)), BadTerms());
-        if (t.kind <= KIND_CLOSE_BELOW) require(t.maxDelay != 0, BadTerms());
+        if (t.kind <= KIND_CLOSE_BELOW) {
+            require(t.maxDelay != 0 && t.maxDelay <= MAX_DELAY_CAP, BadTerms());
+        }
         _read(t); // the feed must answer now
         _terms[market] = t;
         openedAt[market] = uint64(block.timestamp);

@@ -27,7 +27,7 @@ contract HedgeUSD is ERC20 {
     uint256 public constant FAUCET_AMOUNT = 1000e18;
     mapping(address => uint256) public lastFaucet;
 
-    constructor(address _owner) ERC20("Sooth Hedge Demo USD", "hUSD") {
+    constructor(address _owner) ERC20("Sooth Hedge Demo USD (no value)", "hUSD-DEMO") {
         owner = _owner;
     }
 
@@ -44,7 +44,9 @@ contract HedgeUSD is ERC20 {
 }
 
 /// @notice One Sooth node with a PriceFeedAdjudicator. One admin key holds every
-///         role (protocol owner, node admin, profile owner and guardian).
+///         role (protocol owner, node admin and profile owner). With vetoPeriod 0 there
+///         is no guardian: only the feed decides. With vetoPeriod > 0 the admin is
+///         also the guardian and can veto a feed result.
 abstract contract HedgeSetup is CommonBase {
     bytes32 internal constant RELEASE = keccak256("sooth-hedge-bnb-v1");
     /// sooth-factory v0.1.1 (765fa25)
@@ -76,7 +78,7 @@ abstract contract HedgeSetup is CommonBase {
 
         PriceFeedAdjudicator adj =
             new PriceFeedAdjudicator(admin, d.node.marketFactory, vetoPeriod, feeds);
-        adj.approveGuardian(admin);
+        if (vetoPeriod != 0) adj.approveGuardian(admin);
         adj.approveResolver(address(adj)); // only the feed resolves
         adj.setEarlyResolution(true); // TOUCH markets settle when the strike is hit
         adj.freezeProfile();

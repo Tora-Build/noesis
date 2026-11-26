@@ -16,13 +16,15 @@ npm test
 
 | Name | Use |
 |---|---|
-| `RPC_URL` | BSC RPC. You can also pass `--rpc`. |
+| `RPC_URL` | BSC RPC. You can also pass `--rpc`. `BSC_RPC_URL` is used when neither is set. |
 | `PRIVATE_KEY` | Signer for `--execute`. Not needed for a dry run. The agent never logs it. |
 | `AMM_ADDRESS` | Optional. Overrides the AMM found through the market factory. |
-| `CMC_API_KEY` | Optional. Without it the agent uses the keyless CMC API. |
+| `CMC_API_KEY` | Optional. Without it the agent uses the keyless CMC API. Each report says which (`inputs.cmc.mode`). |
 | `COURNOT_API_KEY` | Optional. A prepaid Cournot key (`ck_live_...`). Sent as the `COURNOT-API-KEY` header. |
 | `COURNOT_OFFLINE` | Set to `1` to block all Cournot probability calls. |
 
+The agent and the keeper read `agent/.env`, then the repo root `.env`. A value already in the
+environment wins. No value is ever printed. `node --env-file=../.env run.mjs ...` also works.
 Do not commit a `.env` file. The `.gitignore` excludes `.env`, `cache/` and `out/`.
 
 ## Commands
@@ -33,7 +35,7 @@ Analyze a market. This is a dry run. It builds the trade but does not send it.
 node run.mjs --market 0xMARKET --rpc $RPC_URL
 ```
 
-Add the Cournot probability. Each IP gets only 3 free probability calls in total. The agent caches the result in `cache/` for 6 hours per market id. It never pays. A 402 answer gives a `COURNOT_PAYMENT_REQUIRED` alert, and the decision uses the CMC model only.
+Add the Cournot probability. Each IP gets only 3 free probability calls in total. The agent caches every attempt in `cache/` per market id, with no expiry. Failures (402, 429, 5xx, network) are cached too, and the attempt is recorded before the request is sent. So a rerun never spends another free call. Pass `--refresh-cournot` to call again on purpose. It never pays. A 402 answer gives a `COURNOT_PAYMENT_REQUIRED` alert, and the decision uses the CMC model only.
 
 ```sh
 node run.mjs --market 0xMARKET --rpc $RPC_URL --cournot-id 113195
@@ -47,7 +49,9 @@ Send the trade. This needs `PRIVATE_KEY`.
 PRIVATE_KEY=0x... node run.mjs --market 0xMARKET --rpc $RPC_URL --execute
 ```
 
-Other options: `--asset BNB` (when the feed is unknown), `--bankroll 100`, `--threshold 0.05`, `--slippage 0.02`, `--out <dir>`.
+Other options: `--asset BNB` (when the feed is unknown), `--bankroll 100`, `--threshold 0.05`, `--slippage 0.02`, `--out <dir>`, `--refresh-cournot`.
+
+`npm run clean` (or `npm run agent:clean` from the repo root) clears `out/`. It keeps `cache/`.
 
 Make a report from fixtures for the demo page. No network.
 
@@ -55,13 +59,19 @@ Make a report from fixtures for the demo page. No network.
 node run.mjs --offline --fixture test/fixtures/demo-bnb.json
 ```
 
-Each run writes `out/<market>.json`. It holds every input, the Cournot evidence, the decision, the alerts and the tx data or hash.
+Each run writes `out/<market>.json`. It holds every input, the Cournot evidence, the decision, the alerts and the tx data or hash. For proof it also holds:
+
+- `chainId` and `proof`: the block number and hash the chain was read at, the AMM state (`qYes`, `qNo`, `priceWad`) and the feed price and time (`feed.ts`).
+- `inputs.cmc.mode`: `keyed` or `keyless`.
+- `inputs.cmc.calls`: `[{ path, at, status }]`, one per CMC HTTP request. No key and no query string. Use it to match the report to the CMC API log.
 
 Run the keeper. It simulates `settleFromFeed` when a TOUCH market has crossed or a market passed its deadline. It simulates `settle` when `canSettle` is true. It sends only with `--execute`.
 
 ```sh
 node keeper.mjs --rpc $RPC_URL 0xMARKET1 0xMARKET2 [--execute] [--loop 60]
 ```
+
+`--loop` must be 10 seconds or more. The keeper keeps the hash of each tx it sent, per market. It skips that market until the tx is mined, so a slow block never causes a second send. With the default `VETO_SECONDS=0` there is no veto window: `settle` can follow `settleFromFeed` on the next tick.
 
 ## How it decides
 
@@ -71,7 +81,10 @@ node keeper.mjs --rpc $RPC_URL 0xMARKET1 0xMARKET2 [--execute] [--loop 60]
 4. Fair `p* = 0.6 p_c + 0.4 p_m`, or `p_m` when Cournot is missing.
 5. Risk 0 to 100: 40% volatility, 25% Fear and Greed extremes, 35% closeness to the strike.
 6. If `|p* - p_s| > 0.05` and risk is below 75, buy YES or NO. Size is half Kelly times `(1 - risk/100)`, capped at 10% of bankroll. Else HOLD.
-7. Alerts: `COURNOT_SOOTH_GAP` (gap over 15%), `HIGH_RISK` (70 or more), `FEED_STALE` (feed older than 900 s, also forces HOLD), `FEED_CMC_DIVERGENCE`, `COURNOT_PAYMENT_REQUIRED`, `COURNOT_UNAVAILABLE`.
+7. Before a trade, the agent quotes it on chain. It bisects the shares down until the cost with fee is at most the size. If the YES price after the trade is within half the threshold of `p*` (for a YES buy: above `p* - 0.025`; for a NO buy: below `p* + 0.025`), no edge is left and it holds. The report keeps the first plan in `decision.preImpact`.
+8. Alerts: `COURNOT_SOOTH_GAP` (gap over 15%), `HIGH_RISK` (70 or more), `FEED_STALE` (feed older than 900 s, also forces HOLD), `FEED_CMC_DIVERGENCE`, `COURNOT_PAYMENT_REQUIRED`, `COURNOT_UNAVAILABLE`.
+
+HOLD on `FEED_STALE` is intended. Atlas stock feeds only publish while the stock market is open, so at night and on weekends the agent holds. It does not trade on an old price.
 
 ## Files
 
@@ -81,6 +94,7 @@ node keeper.mjs --rpc $RPC_URL 0xMARKET1 0xMARKET2 [--execute] [--loop 60]
 - `src/sooth.mjs`: chain reads, trade build and send.
 - `src/decide.mjs`: decision and alerts.
 - `src/report.mjs`: the pipeline that joins all inputs.
+- `src/env.mjs`: reads `.env` files without printing values.
 - `run.mjs`, `keeper.mjs`: CLIs.
 - `test/`: `node --test` suites. Tests block the network.
 

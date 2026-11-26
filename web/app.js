@@ -94,7 +94,11 @@ const span = (s) => {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const txUrl = (h) => `${EXPLORER}/tx/${h}`;
 const addrUrl = (a) => `${EXPLORER}/address/${a}`;
-const link = (href, text) => `<a href="${esc(href)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+// Only http(s) links. Anything else (javascript:, data:, relative) is shown as plain text.
+const safeHref = (href) => { try { const u = new URL(String(href)); return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null; } catch { return null; } };
+const link = (href, text) => { const h = safeHref(href); return h ? `<a href="${esc(h)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>` : esc(text); };
+const isHash = (h) => typeof h === 'string' && /^0x[0-9a-fA-F]{64}$/.test(h);
+const num = (x) => (typeof x === 'number' && Number.isFinite(x) ? x : null);
 const ceil2 = (x) => Math.floor(x * 100) / 100;
 
 function humanError(e) {
@@ -106,7 +110,7 @@ function humanError(e) {
   if (/TooEarly/.test(m)) return 'The market time is not over yet.';
   if (/StalePrice/.test(m)) return 'No feed price after the market time yet. Try again after the next update.';
   if (/NoPosition/.test(m)) return 'This wallet has no shares in this market.';
-  if (/insufficient|exceeds balance/i.test(m)) return 'Not enough hUSD. Get demo hUSD first.';
+  if (/insufficient|exceeds balance/i.test(m)) return 'Not enough hUSD-DEMO. Get hUSD-DEMO first.';
   return (e?.shortMessage ?? e?.message ?? 'Something went wrong.').split('\n')[0];
 }
 
@@ -276,7 +280,7 @@ function renderForm() {
   const m = S.markets.get(S.sel);
   const ps = protectable(S.asset);
   const strikeSel = $('#strike');
-  const html = ps.map((x) => `<option value="${x.addr}"${x.addr === S.sel ? ' selected' : ''}>${usd(x.strike)}${isTouch(x.kind) ? ' (touch)' : ''}</option>`).join('');
+  const html = ps.map((x) => `<option value="${esc(x.addr)}"${x.addr === S.sel ? ' selected' : ''}>${usd(x.strike)}${isTouch(x.kind) ? ' (touch)' : ''}</option>`).join('');
   if (strikeSel.innerHTML !== html) strikeSel.innerHTML = html;
   strikeSel.disabled = !ps.length;
   const ap = assetPrice(S.asset);
@@ -311,6 +315,7 @@ function protectPlan() {
 
 let quoteTimer = null, quoteSeq = 0;
 function scheduleQuote() {
+  if (dialogOpen()) return; // the dialog shows a frozen quote
   clearTimeout(quoteTimer);
   const plan = protectPlan();
   if (plan.err) { setQuoteView(null, plan); setMsg('#formMsg', plan.err); $('#protectBtn').disabled = true; return; }
@@ -341,7 +346,7 @@ function validateQuote() {
   const pay = wad(q.net);
   let msg = '', bad = false;
   if (pay > MAX_TRADE) { msg = `That is above the ${usd(MAX_TRADE, 0)} limit per trade. Lower the amount or pick a lower level.`; bad = true; }
-  else if (S.account && S.balance != null && S.balance < pay * (1 + Number(SLIP_BPS) / 1e4)) { msg = `You have ${usd(S.balance)} hUSD. Get demo hUSD first.`; }
+  else if (S.account && S.balance != null && S.balance < pay * (1 + Number(SLIP_BPS) / 1e4)) { msg = `You have ${usd(S.balance)} hUSD-DEMO. Get hUSD-DEMO first.`; }
   setMsg('#formMsg', msg, bad ? 'err' : '');
   $('#protectBtn').disabled = bad || !live(q.m);
 }
@@ -395,8 +400,8 @@ function renderAsset() {
 
 function settleButtons(m) {
   const s = settleState(m);
-  if (s.kind === 'propose') return `<span>${s.why === 'touch' ? 'The feed touched the level.' : 'Time is over.'} Anyone can settle: <button class="btn-link" data-act="propose" data-m="${m.addr}">Settle from feed</button></span>`;
-  if (s.kind === 'finalize') return `<span>Guardian window closed. <button class="btn-link" data-act="finalize" data-m="${m.addr}">Finalize</button></span>`;
+  if (s.kind === 'propose') return `<span>${s.why === 'touch' ? 'The feed touched the level.' : 'Time is over.'} Anyone can settle: <button class="btn-link" data-act="propose" data-m="${esc(m.addr)}">Settle from feed</button></span>`;
+  if (s.kind === 'finalize') return `<span>The feed result is in. Anyone can finalize: <button class="btn-link" data-act="finalize" data-m="${esc(m.addr)}">Finalize</button></span>`;
   return '';
 }
 
@@ -411,7 +416,7 @@ function drawRuler() {
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   // 1σ band to the market time, from the agent's volatility. Only when a report has it.
   const r = m?.report ?? assetReport(a);
-  const sigma = r?.inputs?.cmc?.sigma;
+  const sigma = num(r?.inputs?.cmc?.sigma);
   const T = m ? Math.max(0, m.deadline - S.now) / (365 * 86400) : 0;
   const band = sigma && T > 0 ? [ap.price * Math.exp(-sigma * Math.sqrt(T)), ap.price * Math.exp(sigma * Math.sqrt(T))] : null;
   const vals = [ap.price, ...ms.map((x) => x.strike), ...(band ?? [])];
@@ -451,7 +456,7 @@ function drawRuler() {
       : (move > 0 ? `Pays YES after a ${move.toFixed(1)}% rise.` : 'The price is already at or above this level.'));
     bits.push('Shaded red: the payout zone.');
   }
-  if (band) bits.push(`Yellow bar: 1σ range to ${when(m.deadline).replace(/, \d\d:\d\d UTC/, '')} from ${(sigma * 100).toFixed(0)}% volatility (${r.inputs.cmc.sigmaSource === 'default' ? 'default value' : 'CoinMarketCap 30d'}).`);
+  if (band) bits.push(`Yellow bar: 1σ range to ${when(m.deadline).replace(/, \d\d:\d\d UTC/, '')} from ${(sigma * 100).toFixed(0)}% volatility (${sigmaText(r.inputs.cmc)}).`);
   cap.textContent = bits.join(' ');
 }
 const anchor = (x, W) => (x < 60 ? 'start' : x > W - 60 ? 'end' : 'middle');
@@ -477,7 +482,7 @@ function renderLadder() {
     const you = m.pos && (m.pos.yes > 0 || m.pos.no > 0) ? `${m.pos.yes > 0 ? usd(m.pos.yes) : ''}${m.pos.no > 0 ? `<span class="gap-note">${m.pos.no.toFixed(2)} NO</span>` : ''}` : '<span class="muted">-</span>';
     const fair = d?.pModel, cour = d?.pCournot;
     const gap = fair != null && m.yes != null ? fair - m.yes : null;
-    return `<tr tabindex="0" data-m="${m.addr}" aria-selected="${m.addr === S.sel}">
+    return `<tr tabindex="0" data-m="${esc(m.addr)}" aria-selected="${m.addr === S.sel}">
       <td><span class="lvl">${usd(m.strike)}</span><span class="kind">${KIND_NAME[m.kind]}${dls.length > 1 ? `, ${when(m.deadline)}` : ''}</span></td>
       <td class="c-dist mono">${dist == null ? '-' : signed(dist, 1)}</td>
       <td class="r">${cents(m.yes)}</td>
@@ -513,6 +518,13 @@ async function traderQuote() {
   } catch (e) { if (seq === tSeq) $('#tQuote').textContent = `no quote: ${humanError(e)}`; }
 }
 
+// Plain words for where the volatility came from. Honest: a default is a guess, not data.
+function sigmaText(c) {
+  if (c.sigmaSource === 'realized_1d_candles') return `realized, ${num(c.candles?.count) ?? 30} daily CMC DEX candles`;
+  if (c.sigmaSource === 'default') return 'fixed default for this asset, no CMC candles';
+  return c.sigmaSource ? String(c.sigmaSource) : '';
+}
+
 function renderAgent() {
   const m = S.markets.get(S.sel);
   const r = m?.report;
@@ -523,37 +535,54 @@ function renderAgent() {
     return;
   }
   const d = r.decision ?? {}, inp = r.inputs ?? {}, c = inp.cmc ?? {}, p = d.params ?? {};
-  $('#agWhen').textContent = `${r.generatedAt ? `Report ${when(Date.parse(r.generatedAt) / 1000)}` : 'Report'}${r.mode ? ` · ${r.mode === 'dry-run' ? 'dry run' : r.mode}` : ''}`;
-  const stale = (d.alerts ?? []).some((a) => (a.code ?? a) === 'FEED_STALE');
+  const calls = Array.isArray(c.calls) ? c.calls.length : 0;
+  const cmcMode = c.mode === 'keyed' ? `CMC keyed, ${calls} call${calls === 1 ? '' : 's'}` : c.mode === 'keyless' ? `CMC keyless, ${calls} call${calls === 1 ? '' : 's'}` : '';
+  const block = num(r.proof?.block);
+  $('#agWhen').textContent = [
+    r.generatedAt ? `Report ${when(Date.parse(r.generatedAt) / 1000)}` : 'Report',
+    r.mode ? (r.mode === 'dry-run' ? 'dry run' : String(r.mode)) : '',
+    block != null ? `block #${block.toLocaleString('en-US')}` : '',
+    cmcMode,
+  ].filter(Boolean).join(' · ');
+  const stale = (d.alerts ?? []).some((a) => (a?.code ?? a) === 'FEED_STALE');
   let say, why;
-  if (d.action === 'BUY_YES') { say = 'Protection is cheap. The agent buys it.'; why = `Market ${cents(d.pSooth)}, fair ${cents(d.pStar)} per $1.`; }
-  else if (d.action === 'BUY_NO') { say = 'Protection is expensive. The agent sells it.'; why = `Market ${cents(d.pSooth)}, fair ${cents(d.pStar)} per $1.`; }
-  else if (stale) { say = 'The feed is old. The agent holds.'; why = d.reason ?? ''; }
-  else if (d.action === 'HOLD') { say = 'The price is fair. The agent holds.'; why = `Market ${cents(d.pSooth)}, fair ${cents(d.pStar)}. The gap is under ${pct(p.edgeThreshold, 0)}.`; }
+  if (d.action === 'BUY_YES') { say = 'Protection is cheap. The agent buys it.'; why = `Market ${cents(num(d.pSooth))}, fair ${cents(num(d.pStar))} per $1.`; }
+  else if (d.action === 'BUY_NO') { say = 'Protection is expensive. The agent sells it.'; why = `Market ${cents(num(d.pSooth))}, fair ${cents(num(d.pStar))} per $1.`; }
+  else if (stale) { say = 'The feed is old. The agent holds.'; why = `${d.reason ?? ''} Atlas stock feeds pause when the stock market is closed, at night and on weekends.`; }
+  else if (d.action === 'HOLD' && d.preImpact) { say = 'The trade would use up the edge. The agent holds.'; why = d.reason ?? ''; }
+  else if (d.action === 'HOLD') { say = 'The price is fair. The agent holds.'; why = `Market ${cents(num(d.pSooth))}, fair ${cents(num(d.pStar))}. The gap is under ${pct(num(p.edgeThreshold), 0)}.`; }
   else { say = 'No decision in this report.'; why = ''; }
-  const fg = c.fearGreed;
-  const risk = d.risk ?? inp.model?.risk?.score;
-  const div = c.spot && inp.spot ? (c.spot / inp.spot - 1) * 100 : null;
-  const metric = (k, v, extra = '', meter = null) => `<div class="metric"><dt>${k}</dt><dd>${v}${extra ? `<small>${extra}</small>` : ''}</dd>${meter != null ? `<div class="meter" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, meter))}%"></i></div>` : ''}</div>`;
-  const blend = d.pCournot != null
-    ? `fair = ${p.cournotWeight ?? 0.6} × Cournot ${pct(d.pCournot)} + ${(1 - (p.cournotWeight ?? 0.6)).toFixed(1)} × model ${pct(d.pModel)} = ${pct(d.pStar)}`
-    : `fair = model ${pct(d.pModel)}  (Cournot: ${esc(inp.cournot?.state ?? 'none')})`;
-  const sent = r.tx?.sent?.trade ?? r.tx?.hash;
-  const ev = r.evidence?.lines ?? [];
+  const fg = c.fearGreed ?? {};
+  const fgv = num(fg.value);
+  const risk = num(d.risk) ?? num(inp.model?.risk?.score);
+  const cspot = num(c.spot), fspot = num(inp.spot);
+  const div = cspot && fspot ? (cspot / fspot - 1) * 100 : null;
+  const g = c.global ?? {};
+  const dom = num(g.btcDominance), capChg = num(g.marketCapChange24hPct);
+  // Every value goes through esc(). Numbers are formatted first, so a bad report shows "-".
+  const metric = (k, v, extra = '', meter = null) => `<div class="metric"><dt>${esc(k)}</dt><dd>${esc(v)}${extra ? `<small>${esc(extra)}</small>` : ''}</dd>${num(meter) != null ? `<div class="meter" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, meter))}%"></i></div>` : ''}</div>`;
+  const w = num(p.cournotWeight) ?? 0.6;
+  const blend = num(d.pCournot) != null
+    ? `fair = ${w} × Cournot ${pct(num(d.pCournot))} + ${(1 - w).toFixed(1)} × model ${pct(num(d.pModel))} = ${pct(num(d.pStar))}`
+    : `fair = model ${pct(num(d.pModel))}  (Cournot: ${inp.cournot?.state ?? 'none'})`;
+  const sent = [r.tx?.sent?.trade, r.tx?.hash].find(isHash);
+  const ev = Array.isArray(r.evidence?.lines) ? r.evidence.lines : [];
   body.innerHTML = `
     <p class="say">${esc(say)}<small>${esc(why)}</small></p>
     <dl class="metrics">
-      ${metric('Fear & Greed (CMC)', fg?.value ?? '-', fg?.classification ? esc(fg.classification) : '', fg?.value)}
-      ${metric('Volatility, yearly', c.sigma != null ? pct(c.sigma, 0) : '-', c.sigmaSource === 'default' ? 'default, no CMC candles' : c.sigmaSource ? 'CMC 30d candles' : '')}
-      ${metric('Risk score', risk != null ? `${Math.round(risk)}/100` : '-', risk >= (p.highRisk ?? 70) ? 'high' : '', risk)}
-      ${metric('CMC vs feed', c.spot != null ? usd(c.spot) : '-', div != null ? `${signed(div)} from feed` : '')}
-      ${metric('Edge', d.edge != null ? signed(d.edge * 100, 1) : '-', p.edgeThreshold != null ? `acts above ${pct(p.edgeThreshold, 0)}` : '')}
-      ${metric('Size', d.sizeUsd ? usd(d.sizeUsd) : '$0', p.bankroll ? `of ${usd(p.bankroll, 0)} bankroll` : '')}
+      ${metric('Fear & Greed (CMC)', fgv ?? '-', typeof fg.classification === 'string' ? fg.classification : '', fgv)}
+      ${metric('Volatility, yearly', num(c.sigma) != null ? pct(c.sigma, 0) : '-', sigmaText(c))}
+      ${metric('Risk score', risk != null ? `${Math.round(risk)}/100` : '-', risk != null && risk >= (num(p.highRisk) ?? 70) ? 'high' : '', risk)}
+      ${metric('CMC vs feed', cspot != null ? usd(cspot) : '-', div != null ? `${signed(div)} from feed` : '')}
+      ${metric('BTC dominance (CMC)', dom != null ? `${dom.toFixed(1)}%` : '-', 'share of all crypto')}
+      ${metric('Crypto market cap, 24h', capChg != null ? signed(capChg) : '-', 'CMC global data')}
+      ${metric('Edge', num(d.edge) != null ? signed(d.edge * 100, 1) : '-', num(p.edgeThreshold) != null ? `acts above ${pct(p.edgeThreshold, 0)}` : '')}
+      ${metric('Size', num(d.sizeUsd) ? usd(d.sizeUsd) : '$0', num(p.bankroll) ? `of ${usd(p.bankroll, 0)} bankroll` : '')}
     </dl>
-    <p class="blend">${blend}</p>
-    ${(d.alerts ?? []).length ? `<ul class="alerts">${d.alerts.map((a) => `<li><b>${esc(a.code ?? '')}</b>${esc(a.message ?? a)}</li>`).join('')}</ul>` : ''}
+    <p class="blend">${esc(blend)}</p>
+    ${(d.alerts ?? []).length ? `<ul class="alerts">${d.alerts.map((a) => `<li><b>${esc(a?.code ?? '')}</b>${esc(a?.message ?? a)}</li>`).join('')}</ul>` : ''}
     ${sent ? `<p class="small">Agent trade: ${link(txUrl(sent), short(sent))}</p>` : ''}
-    ${ev.length ? `<details class="evidence"><summary>Cournot evidence (${ev.length})</summary><ul>${ev.map((e) => typeof e === 'string' ? `<li>${esc(e)}</li>` : `<li>${e.url ? link(e.url, e.source ?? e.title ?? e.url) : esc(e.source ?? '')}${e.summary ? `: ${esc(e.summary)}` : ''}</li>`).join('')}</ul></details>` : ''}`;
+    ${ev.length ? `<details class="evidence"><summary>Cournot evidence (${ev.length})</summary><ul>${ev.map((e) => typeof e === 'string' ? `<li>${esc(e)}</li>` : `<li>${e?.url ? link(e.url, e.source ?? e.title ?? e.url) : esc(e?.source ?? e?.text ?? '')}${e?.summary ? `: ${esc(e.summary)}` : ''}</li>`).join('')}</ul></details>` : ''}`;
 }
 
 function renderSettled() {
@@ -581,10 +610,10 @@ function renderSettled() {
     let claim = '';
     if (m.settled && m.pos && (m.pos.yes > 0 || m.pos.no > 0)) {
       const pay = out === 1 ? m.pos.yes : out === 0 ? m.pos.no : (m.pos.yes + m.pos.no) / 2;
-      claim = pay > 0 ? `<button class="btn btn-ink btn-sm" data-act="claim" data-m="${m.addr}">Claim ${usd(pay)}</button>` : '<span class="muted">Your shares did not win.</span>';
+      claim = pay > 0 ? `<button class="btn btn-ink btn-sm" data-act="claim" data-m="${esc(m.addr)}">Claim ${usd(pay)}</button>` : '<span class="muted">Your shares did not win.</span>';
     }
-    const act = s.kind === 'propose' ? `<button class="btn btn-sm" data-act="propose" data-m="${m.addr}">Settle from feed</button>`
-      : s.kind === 'finalize' ? `<button class="btn btn-sm" data-act="finalize" data-m="${m.addr}">Finalize</button>` : '';
+    const act = s.kind === 'propose' ? `<button class="btn btn-sm" data-act="propose" data-m="${esc(m.addr)}">Settle from feed</button>`
+      : s.kind === 'finalize' ? `<button class="btn btn-sm" data-act="finalize" data-m="${esc(m.addr)}">Finalize</button>` : '';
     return `<li class="set-item">
       <div class="set-top">
         <div><p class="set-q">${esc(m.asset)} ${isBelow(m.kind) ? 'at or below' : 'at or above'} ${usd(m.strike)}</p>
@@ -605,20 +634,22 @@ function renderMine() {
 
 function renderWallet() {
   const b = $('#connect');
-  b.textContent = S.account ? `${S.balance != null ? `${usd(S.balance)} hUSD · ` : ''}${short(S.account)}` : 'Connect wallet';
+  b.textContent = S.account ? `${S.balance != null ? `${usd(S.balance)} hUSD-DEMO · ` : ''}${short(S.account)}` : 'Connect wallet';
   b.title = S.account ? S.account : '';
 }
 
 function renderFooter() {
-  const rows = [['Adjudicator', cfg.adjudicator], ['Sooth AMM', cfg.amm], ['Market factory', cfg.marketFactory], ['hUSD (demo)', cfg.stable]];
+  const rows = [['Adjudicator', cfg.adjudicator], ['Sooth AMM', cfg.amm], ['Market factory', cfg.marketFactory], ['hUSD-DEMO (no value)', cfg.stable]];
   $('#contracts').innerHTML = rows.map(([k, a]) => `<dt>${k}</dt><dd>${link(addrUrl(a), short(a))}</dd>`).join('');
 }
 
-function setMsg(sel, text, kind = '') {
+// setMsg escapes its text. setMsgHtml takes markup built here (links via link()).
+function setMsgHtml(sel, html, kind = '') {
   const el = $(sel);
   el.className = `form-msg${kind ? ` ${kind}` : ''}`;
-  el.innerHTML = text;
+  el.innerHTML = html;
 }
+function setMsg(sel, text, kind = '') { setMsgHtml(sel, esc(text), kind); }
 
 let toastTimer;
 function toast(html, ms = 6000) {
@@ -632,21 +663,45 @@ function fatal(msg) {
 }
 
 // ── Wallet and transactions ──────────────────────────────────────────
+const walletClient = () => createWalletClient({ chain, transport: custom(window.ethereum) });
+
+function resetWallet() {
+  S.wallet = null; S.account = null; S.balance = null;
+  renderWallet();
+}
+
+// Make sure the wallet is on our chain. Ask to switch, add the chain if the wallet does not know
+// it, then check again. If the wallet is still elsewhere, stop: never send on the wrong chain.
+async function ensureChain() {
+  if ((await S.wallet.getChainId()) === chain.id) return;
+  try { await S.wallet.switchChain({ id: chain.id }); }
+  catch (e) {
+    if (/rejected|denied|4001/i.test(`${e?.message} ${e?.code}`)) throw new Error(`Switch your wallet to ${chain.name} to continue.`);
+    await S.wallet.addChain({ chain });
+  }
+  if ((await S.wallet.getChainId()) !== chain.id) throw new Error(`Your wallet is not on ${chain.name}. Switch it and try again.`);
+}
+
 async function connect() {
   if (!window.ethereum) throw new Error('No wallet found. Install a browser wallet to trade. You can still read every market.');
-  S.wallet = createWalletClient({ chain, transport: custom(window.ethereum) });
-  [S.account] = await S.wallet.requestAddresses();
-  const id = await S.wallet.getChainId();
-  if (id !== chain.id) {
-    try { await S.wallet.switchChain({ id: chain.id }); } catch { await S.wallet.addChain({ chain }); }
+  try {
+    S.wallet = walletClient();
+    [S.account] = await S.wallet.requestAddresses();
+    if (!S.account) throw new Error('The wallet gave no account.');
+    await ensureChain();
+  } catch (e) {
+    resetWallet();
+    throw e;
   }
   renderWallet();
   await loadPositions();
   renderAll();
 }
 
+// Every write goes through here: a wallet client, an account and the right chain, each time.
 async function send(address, abi, functionName, args) {
-  if (!S.account) await connect();
+  if (!S.wallet || !S.account) await connect();
+  else await ensureChain();
   const { request } = await pub.simulateContract({ address, abi, functionName, args, account: S.account });
   const hash = await S.wallet.writeContract(request);
   const rc = await pub.waitForTransactionReceipt({ hash });
@@ -663,26 +718,38 @@ async function ensureAllowance(amount, onStep) {
 
 const withSlip = (net) => (net * (10000n + SLIP_BPS)) / 10000n;
 
+// The order shown in the confirm dialog. Frozen when the dialog opens: the 30 s refresh, a new
+// quote or a click on another level cannot change what the buy sends.
+let CF = null;
+const dialogOpen = () => $('#confirm').open;
+
 async function openConfirm() {
-  try { if (!S.account) await connect(); } catch (e) { setMsg('#formMsg', esc(humanError(e)), 'err'); return; }
+  try { if (!S.wallet || !S.account) await connect(); } catch (e) { setMsg('#formMsg', humanError(e), 'err'); return; }
   const plan = protectPlan();
-  if (plan.err) return setMsg('#formMsg', esc(plan.err), 'err');
-  await quote(plan);
-  const q = S.quote;
-  if (!q || $('#protectBtn').disabled) return;
-  const maxCost = withSlip(q.net);
+  if (plan.err) return setMsg('#formMsg', plan.err, 'err');
+  clearTimeout(quoteTimer); quoteSeq++; // stop any quote in flight from writing over this one
+  const shares = parseUnits(plan.shares.toFixed(2), 18);
+  let q;
+  try {
+    const r = await pub.readContract({ address: cfg.amm, abi: AMM, functionName: 'getPositionQuote', args: [plan.m.addr, 1, shares] });
+    q = { m: plan.m, market: plan.m.addr, sharesNum: plan.shares, shares, cost: r[0], fee: r[1], net: r[2], newPrice: r[3] };
+  } catch (e) { return setMsg('#formMsg', `No quote: ${humanError(e)}`, 'err'); }
+  if (wad(q.net) > MAX_TRADE) return setMsg('#formMsg', `That is above the ${usd(MAX_TRADE, 0)} limit per trade. Lower the amount or pick a lower level.`, 'err');
+  if (!live(q.m)) return setMsg('#formMsg', 'Trading is closed for this level.', 'err');
+  q.maxCost = withSlip(q.net);
   const allowance = await pub.readContract({ address: cfg.stable, abi: ERC20, functionName: 'allowance', args: [S.account, cfg.amm] });
-  const needApprove = allowance < maxCost;
-  $('#cfWhat').textContent = `You get ${usd(q.shares)} ${ifText(q.m)}. The ${SRC_LONG[q.m.source]} price settles it.`;
+  const needApprove = allowance < q.maxCost;
+  CF = Object.freeze(q);
+  $('#cfWhat').textContent = `You get ${usd(q.sharesNum)} ${ifText(q.m)}. The ${SRC_LONG[q.m.source]} price settles it.`;
   $('#cfRows').innerHTML = `
     <dt>You pay now</dt><dd class="total">${usd(wad(q.net))}</dd>
-    <dt>Most you pay</dt><dd>${usd(wad(maxCost))} <span class="muted">(${Number(SLIP_BPS) / 100}% slippage)</span></dd>
-    <dt>You get</dt><dd>${usd(q.shares)}</dd>
+    <dt>Most you pay</dt><dd>${usd(wad(q.maxCost))} <span class="muted">(${Number(SLIP_BPS) / 100}% slippage)</span></dd>
+    <dt>You get</dt><dd>${usd(q.sharesNum)}</dd>
     <dt>Fee, included</dt><dd>${usd(wad(q.fee))}</dd>
     <dt>Market price after</dt><dd>${cents(wad(q.newPrice))}</dd>
     <dt>Limit per trade</dt><dd>${usd(MAX_TRADE, 0)} <span class="muted">(this page)</span></dd>
-    <dt>Paid in</dt><dd>hUSD, demo money</dd>`;
-  $('#cfSteps').innerHTML = `${needApprove ? `<li data-s="approve">Allow the Sooth AMM to take up to ${usd(wad(maxCost))} hUSD</li>` : ''}<li data-s="buy">Buy ${usd(q.shares)} of protection</li>`;
+    <dt>Paid in</dt><dd>hUSD-DEMO, demo money with no value</dd>`;
+  $('#cfSteps').innerHTML = `${needApprove ? `<li data-s="approve">Allow the Sooth AMM to take up to ${usd(wad(q.maxCost))} hUSD-DEMO</li>` : ''}<li data-s="buy">Buy ${usd(q.sharesNum)} of protection</li>`;
   setMsg('#cfMsg', '');
   $('#cfGo').disabled = false;
   $('#cfGo').textContent = 'Confirm in wallet';
@@ -690,7 +757,7 @@ async function openConfirm() {
 }
 
 async function runProtect() {
-  const q = S.quote;
+  const q = CF;
   if (!q) return;
   const go = $('#cfGo');
   go.disabled = true;
@@ -698,18 +765,25 @@ async function runProtect() {
     li.className = li.dataset.s === s ? 'now' : (s === 'buy' && li.dataset.s === 'approve') || s === 'done' ? 'done' : '';
   });
   try {
-    const maxCost = withSlip(q.net);
-    await ensureAllowance(maxCost, (s) => { step(s); setMsg('#cfMsg', 'Approve in your wallet.'); });
+    // Quote again now. If the price moved so the most you pay is above what this dialog showed, stop.
+    const fresh = await pub.readContract({ address: cfg.amm, abi: AMM, functionName: 'getPositionQuote', args: [q.market, 1, q.shares] });
+    const freshMax = withSlip(fresh[2]);
+    if (freshMax > q.maxCost) {
+      setMsg('#cfMsg', `The price moved. The most you pay is now ${usd(wad(freshMax))}, above the ${usd(wad(q.maxCost))} shown. Nothing was sent. Close this and get a new quote.`, 'err');
+      go.textContent = 'Price moved';
+      return;
+    }
+    await ensureAllowance(q.maxCost, (s) => { step(s); setMsg('#cfMsg', 'Approve in your wallet.'); });
     step('buy'); setMsg('#cfMsg', 'Confirm the purchase in your wallet.');
-    const hash = await send(cfg.amm, AMM, 'tradePositions', [q.m.addr, 1, parseUnits(q.shares.toFixed(2), 18), maxCost]);
+    // The limit sent is the one shown, never a newer quote.
+    const hash = await send(cfg.amm, AMM, 'tradePositions', [q.market, 1, q.shares, q.maxCost]);
     step('done');
-    setMsg('#cfMsg', `Protected. ${link(txUrl(hash), 'View tx')}`, 'ok');
+    setMsgHtml('#cfMsg', `Protected. ${link(txUrl(hash), 'View tx')}`, 'ok');
     go.textContent = 'Done';
     setTimeout(() => $('#confirm').close(), 1400);
-    toast(`Protected: ${usd(q.shares)} ${esc(ifText(q.m))}. ${link(txUrl(hash), 'View tx')}`);
-    await refresh();
+    toast(`Protected: ${usd(q.sharesNum)} ${esc(ifText(q.m))}. ${link(txUrl(hash), 'View tx')}`);
   } catch (e) {
-    setMsg('#cfMsg', esc(humanError(e)), 'err');
+    setMsg('#cfMsg', humanError(e), 'err');
     go.disabled = false; go.textContent = 'Try again';
   }
 }
@@ -719,7 +793,7 @@ async function traderBuy() {
   const n = Number($('#tShares').value), side = Number($('input[name=side]:checked').value);
   if (!m || !(n > 0)) return setMsg('#tMsg', 'Enter a number of shares.', 'err');
   try {
-    if (!S.account) await connect();
+    if (!S.wallet || !S.account) await connect();
     const delta = parseUnits(String(n), 18);
     const q = await pub.readContract({ address: cfg.amm, abi: AMM, functionName: 'getPositionQuote', args: [m.addr, side, delta] });
     if (wad(q[2]) > MAX_TRADE) return setMsg('#tMsg', `Above the ${usd(MAX_TRADE, 0)} limit per trade.`, 'err');
@@ -727,9 +801,9 @@ async function traderBuy() {
     await ensureAllowance(maxCost, () => setMsg('#tMsg', 'Approve in your wallet.'));
     setMsg('#tMsg', `Confirm in your wallet. Most you pay: ${usd(wad(maxCost))}.`);
     const hash = await send(cfg.amm, AMM, 'tradePositions', [m.addr, side, delta, maxCost]);
-    setMsg('#tMsg', `Bought ${n} ${side ? 'YES' : 'NO'}. ${link(txUrl(hash), 'View tx')}`, 'ok');
+    setMsgHtml('#tMsg', `Bought ${n} ${side ? 'YES' : 'NO'}. ${link(txUrl(hash), 'View tx')}`, 'ok');
     await refresh();
-  } catch (e) { setMsg('#tMsg', esc(humanError(e)), 'err'); }
+  } catch (e) { setMsg('#tMsg', humanError(e), 'err'); }
 }
 
 async function marketAction(act, addr, btn) {
@@ -756,7 +830,7 @@ const faucet = async (ev) => {
   const b = ev.currentTarget; b.disabled = true;
   try {
     const hash = await send(cfg.stable, ERC20, 'faucet', []);
-    toast(`1,000 demo hUSD sent. ${link(txUrl(hash), 'View tx')}`);
+    toast(`1,000 hUSD-DEMO sent. ${link(txUrl(hash), 'View tx')}`);
     await loadPositions(); validateQuote();
   } catch (e) { toast(esc(humanError(e))); }
   b.disabled = false;
@@ -768,6 +842,7 @@ $('#strike').onchange = (e) => { S.sel = e.target.value; renderAll(); };
 $('#qty').oninput = () => { renderForm(); };
 $('#form').onsubmit = (e) => { e.preventDefault(); openConfirm(); };
 $('#cfGo').onclick = runProtect;
+$('#confirm').addEventListener('close', () => { CF = null; refresh(); });
 $('#tShares').oninput = traderQuote;
 document.querySelectorAll('input[name=side]').forEach((r) => { r.onchange = traderQuote; });
 $('#tBuy').onclick = traderBuy;
@@ -785,12 +860,19 @@ document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]');
   if (b) marketAction(b.dataset.act, b.dataset.m, b);
 });
-window.ethereum?.on?.('accountsChanged', (a) => { S.account = a[0] ?? null; if (S.account) loadPositions().then(renderAll); else { S.balance = null; renderWallet(); renderAll(); } });
+// The wallet client is made here too, so a later send() never meets an account without a wallet.
+window.ethereum?.on?.('accountsChanged', (a) => {
+  if (!a?.[0]) { resetWallet(); renderAll(); return; }
+  S.account = a[0];
+  S.wallet ??= walletClient();
+  loadPositions().then(renderAll).catch(() => {});
+});
 window.ethereum?.on?.('chainChanged', () => location.reload());
 let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawRuler, 120); });
 
 // ── Start ────────────────────────────────────────────────────────────
 async function refresh() {
+  if (dialogOpen()) return; // paused while the confirm dialog is open; runs again on close
   try {
     await refreshChain();
     await loadMarkets();
@@ -808,7 +890,7 @@ async function refresh() {
 
 renderFooter();
 pub.readContract({ address: cfg.adjudicator, abi: ADJ, functionName: 'vetoPeriod' })
-  .then((v) => { S.vetoPeriod = Number(v); $('#vetoMin').textContent = span(Number(v)); }).catch(() => {});
+  .then((v) => { S.vetoPeriod = Number(v); $('#vetoMin').textContent = span(Number(v)); $('#vetoNote').hidden = !(S.vetoPeriod > 0); }).catch(() => {});
 if (!cfg.markets?.length) formEmpty('No markets yet.');
 await refresh();
 setInterval(refresh, 30_000);

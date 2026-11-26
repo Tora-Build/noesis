@@ -105,9 +105,10 @@ export async function readMarket(client, market, { amm } = {}) {
   const now = Number(block.timestamp);
   return {
     market, amm, adjudicator, factory,
+    block: block.number == null ? null : Number(block.number), blockHash: block.hash ?? null,
     deadline: Number(deadline), now, tradingOpen, settled, resolving,
     tokenA, decimals: Number(decimals),
-    qYes: qYes.toString(), qNo: qNo.toString(),
+    qYes: qYes.toString(), qNo: qNo.toString(), priceWad: priceWad.toString(),
     yesPrice: wadToFloat(priceWad),
     terms: terms && {
       source: Number(terms.source), feed: terms.feed, feedId: terms.feedId, kind: Number(terms.kind),
@@ -130,6 +131,63 @@ export function wadToNativeCeil(wad, decimals) {
 export function sharesForBudget(sizeUsd, price) {
   if (!(sizeUsd > 0) || !(price > 0)) return 0n;
   return floatToWad(sizeUsd / price);
+}
+
+/** Read a quote for buying `shares` (WAD) of `outcome`. Floats for prices, bigint for amounts. */
+export async function quoteBuy(client, { market, amm, outcome, shares }) {
+  const [cost, fee, netAmount, newPrice] = await client.readContract({ address: amm, abi: ammAbi, functionName: "getPositionQuote", args: [market, outcome, shares] });
+  return { shares, cost, fee, netAmount, newPrice: wadToFloat(newPrice) };
+}
+
+/**
+ * Pure (given quoteFn): the most shares whose quoted netAmount (fee included) fits the budget.
+ * Starts from `shares` and bisects down. LMSR cost rises with size, so the search is monotone.
+ * @param {(shares: bigint) => Promise<{netAmount: bigint, newPrice: number}>} quoteFn
+ * @returns {Promise<{shares: bigint, quote: object|null, iterations: number}>}
+ */
+export async function fitSharesToBudget(quoteFn, shares, budgetWad, { maxIter = 24, minShares = 10n ** 14n } = {}) {
+  if (shares <= 0n || budgetWad <= 0n) return { shares: 0n, quote: null, iterations: 0 };
+  let q = await quoteFn(shares);
+  if (q.netAmount <= budgetWad) return { shares, quote: q, iterations: 1 };
+  let lo = 0n, loQuote = null, hi = shares, i = 1;
+  while (i < maxIter && hi - lo > minShares) {
+    const mid = (lo + hi) / 2n;
+    q = await quoteFn(mid);
+    i++;
+    if (q.netAmount <= budgetWad) { lo = mid; loQuote = q; } else hi = mid;
+  }
+  return { shares: lo, quote: loQuote, iterations: i };
+}
+
+/**
+ * Pure: does the trade still leave edge after its own price impact?
+ * `newPrice` is the YES price after the trade. A YES buy pushes it up, a NO buy pushes it down.
+ * The trade is kept only while the post-trade price stays at least half the edge threshold
+ * away from the fair price, on the side we are buying.
+ */
+export function postImpactOk({ outcome, newPrice, pStar, edgeThreshold }) {
+  const margin = edgeThreshold / 2;
+  return outcome === 1 ? newPrice <= pStar - margin : newPrice >= pStar + margin;
+}
+
+/**
+ * Fit a BUY decision to its budget and check the edge after price impact.
+ * @param {(shares: bigint) => Promise<{netAmount: bigint, newPrice: number}>} quoteFn
+ * @param {object} d  a decide() result with action BUY_YES or BUY_NO
+ * @returns {Promise<{ok: true, shares: bigint, quote: object} | {ok: false, reason: string, quote: object|null}>}
+ */
+export async function planBuy(quoteFn, d) {
+  const start = sharesForBudget(d.sizeUsd, d.entryPrice);
+  const budget = floatToWad(d.sizeUsd);
+  const fit = await fitSharesToBudget(quoteFn, start, budget);
+  if (fit.shares <= 0n || !fit.quote) return { ok: false, reason: `No size fits the $${d.sizeUsd} budget.`, quote: null };
+  const t = d.params?.edgeThreshold ?? 0.05;
+  if (!postImpactOk({ outcome: d.outcome, newPrice: fit.quote.newPrice, pStar: d.pStar, edgeThreshold: t })) {
+    const p = (x) => `${(x * 100).toFixed(1)}%`;
+    return { ok: false, quote: fit.quote,
+      reason: `After the trade the YES price would be ${p(fit.quote.newPrice)}. That is within half the threshold (${p(t / 2)}) of fair ${p(d.pStar)}. No edge is left.` };
+  }
+  return { ok: true, shares: fit.shares, quote: fit.quote };
 }
 
 /**

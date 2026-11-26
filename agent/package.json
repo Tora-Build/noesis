@@ -7,7 +7,8 @@
   "engines": { "node": ">=22" },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "demo": "node run.mjs --offline --fixture test/fixtures/demo-bnb.json"
+    "demo": "node run.mjs --offline --fixture test/fixtures/demo-bnb.json",
+    "clean": "node -e \"require('node:fs').rmSync('out',{recursive:true,force:true})\""
   },
   "dependencies": {
     "viem": "2.45.1"

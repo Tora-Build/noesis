@@ -18,18 +18,32 @@ export const ASSETS = {
 
 export function cmcConfig(env = process.env) {
   const key = env.CMC_API_KEY;
-  return key ? { base: KEYED_BASE, headers: { "X-CMC_PRO_API_KEY": key } } : { base: KEYLESS_BASE, headers: {} };
+  return key
+    ? { mode: "keyed", base: KEYED_BASE, headers: { "X-CMC_PRO_API_KEY": key } }
+    : { mode: "keyless", base: KEYLESS_BASE, headers: {} };
 }
 
 const defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** GET a CMC path. Retries 429 and 5xx with exponential backoff (honors Retry-After). */
-export async function cmcRequest(path, params = {}, { fetchImpl = fetch, env = process.env, maxRetries = 4, baseDelayMs = 500, sleep = defaultSleep } = {}) {
+/**
+ * GET a CMC path. Retries 429 and 5xx with exponential backoff (honors Retry-After).
+ * If `calls` is an array, each HTTP attempt is logged as { path, at, status }. The log holds
+ * the path only: no query string, no key. It lets a report be matched to the CMC API log.
+ */
+export async function cmcRequest(path, params = {}, { fetchImpl = fetch, env = process.env, maxRetries = 4, baseDelayMs = 500, sleep = defaultSleep, calls = null, now = () => new Date() } = {}) {
   const { base, headers } = cmcConfig(env);
   const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => [k, String(v)]));
   const url = `${base}${path}${qs.size ? `?${qs}` : ""}`;
   for (let attempt = 0; ; attempt++) {
-    const res = await fetchImpl(url, { headers: { accept: "application/json", ...headers }, signal: AbortSignal.timeout(20_000) });
+    const at = now().toISOString();
+    let res;
+    try {
+      res = await fetchImpl(url, { headers: { accept: "application/json", ...headers }, signal: AbortSignal.timeout(20_000) });
+    } catch (e) {
+      calls?.push({ path, at, status: null });
+      throw e;
+    }
+    calls?.push({ path, at, status: res.status });
     if ((res.status === 429 || res.status >= 500) && attempt < maxRetries) {
       const retryAfter = Number(res.headers?.get?.("retry-after"));
       const wait = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : baseDelayMs * 2 ** attempt;
@@ -154,6 +168,8 @@ export async function fetchCandles({ platform = "bsc", address, interval = "1d",
 export async function fetchSnapshot(symbol, opts = {}) {
   const asset = ASSETS[symbol];
   if (!asset) throw new Error(`Unknown asset ${symbol}`);
+  const calls = [];
+  opts = { ...opts, calls };
   const errors = [];
   const safe = (p, label) => p.catch((e) => { errors.push(`${label}: ${e.message}`); return null; });
   const quotes = asset.cmcId != null ? await safe(fetchQuotes(asset.cmcId, opts), "quotes") : null;
@@ -161,5 +177,5 @@ export async function fetchSnapshot(symbol, opts = {}) {
   const candles = address ? await safe(fetchCandles({ platform: asset.platform ?? "bsc", address }, opts), "candles") : null;
   const fearGreed = await safe(fetchFearGreed(opts), "fear_greed");
   const global = await safe(fetchGlobal(opts), "global");
-  return { ...buildSnapshot({ symbol, asset, quotes, candles, fearGreed, global }), errors };
+  return { ...buildSnapshot({ symbol, asset, quotes, candles, fearGreed, global }), errors, cmcMode: cmcConfig(opts.env).mode, cmcCalls: calls };
 }

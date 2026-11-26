@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { getAddress } from "viem";
 import { makePublicClient, walletFromEnv, marketAbi, adjudicatorAbi, wadToFloat, PHASE } from "./src/sooth.mjs";
 import { KIND } from "./src/model.mjs";
+import { loadEnvFiles } from "./src/env.mjs";
 
 /**
  * Pure: what should the keeper do for one market?
@@ -53,10 +54,33 @@ async function readState(client, market) {
   };
 }
 
-async function tick(client, wallet, market, execute) {
-  const s = await readState(client, market);
+/** Parse and check --loop. Below 10 s would load public RPCs for no gain (the Atlas heartbeat is 60 s). */
+export function parseLoop(v) {
+  if (v == null) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 10) throw new Error("--loop must be a number of seconds, 10 or more.");
+  return n;
+}
+
+/**
+ * One keeper step for one market. `pending` maps market -> tx hash sent and not yet mined.
+ * While a hash is pending, the market is skipped, so a slow block never causes a second send.
+ */
+export async function tick(client, wallet, market, execute, pending = new Map(), { read = readState, receiptTimeoutMs = 60_000 } = {}) {
+  const waiting = pending.get(market);
+  if (waiting) {
+    const rc = await client.getTransactionReceipt({ hash: waiting }).catch(() => null);
+    if (!rc) {
+      const line = { market, action: "PENDING", reason: "A sent tx is not mined yet. Skip.", tx: { hash: waiting } };
+      console.log(JSON.stringify(line));
+      return line;
+    }
+    pending.delete(market);
+    console.log(JSON.stringify({ market, action: "MINED", tx: { hash: waiting, status: rc.status } }));
+  }
+  const s = await read(client, market);
   const plan = keeperPlan(s);
-  const line = { market, phase: s.phase, feed: s.feed?.price, strike: s.terms.strike, ...plan };
+  const line = { market, phase: s.phase, feed: s.feed?.price, strike: s.terms?.strike, ...plan };
   if (plan.action === "SETTLE_FROM_FEED" || plan.action === "SETTLE") {
     const functionName = plan.action === "SETTLE" ? "settle" : "settleFromFeed";
     try {
@@ -65,8 +89,10 @@ async function tick(client, wallet, market, execute) {
       line.simulated = { ok: true, result: result === undefined ? null : Number(result) };
       if (execute) {
         const hash = await wallet.writeContract(request);
-        const receipt = await client.waitForTransactionReceipt({ hash });
-        line.tx = { hash, status: receipt.status };
+        pending.set(market, hash);
+        line.tx = { hash, status: "pending" };
+        const receipt = await client.waitForTransactionReceipt({ hash, timeout: receiptTimeoutMs }).catch(() => null);
+        if (receipt) { pending.delete(market); line.tx.status = receipt.status; }
       }
     } catch (e) {
       line.simulated = { ok: false, error: e.shortMessage ?? e.message };
@@ -81,17 +107,21 @@ async function main() {
     allowPositionals: true,
     options: { rpc: { type: "string" }, execute: { type: "boolean", default: false }, loop: { type: "string" } },
   });
-  const rpc = values.rpc ?? process.env.RPC_URL;
-  if (!rpc || positionals.length === 0) throw new Error("Usage: node keeper.mjs --rpc <url> 0xMarket… [--execute] [--loop <sec>]");
+  const loop = parseLoop(values.loop);
+  const rpc = values.rpc ?? process.env.RPC_URL ?? process.env.BSC_RPC_URL;
+  if (!rpc || positionals.length === 0) throw new Error("Usage: node keeper.mjs --rpc <url> 0xMarket… [--execute] [--loop <sec>=10+]");
   const client = makePublicClient(rpc);
   const wallet = values.execute ? walletFromEnv(rpc) : process.env.PRIVATE_KEY ? walletFromEnv(rpc) : null;
   const markets = positionals.map((m) => getAddress(m));
+  const pending = new Map();
   do {
-    for (const m of markets) await tick(client, wallet, m, values.execute).catch((e) => console.log(JSON.stringify({ market: m, error: e.shortMessage ?? e.message })));
-    if (values.loop) await new Promise((r) => setTimeout(r, Number(values.loop) * 1000));
-  } while (values.loop);
+    for (const m of markets) await tick(client, wallet, m, values.execute, pending).catch((e) => console.log(JSON.stringify({ market: m, error: e.shortMessage ?? e.message })));
+    if (loop) await new Promise((r) => setTimeout(r, loop * 1000));
+  } while (loop);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  const here = new URL(".", import.meta.url).pathname;
+  loadEnvFiles([`${here}.env`, `${here}../.env`]);
   main().catch((e) => { console.error(`Error: ${e.shortMessage ?? e.message}`); process.exit(1); });
 }

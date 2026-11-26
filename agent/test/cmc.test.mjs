@@ -52,8 +52,8 @@ test("buildSnapshot uses candles, falls back to default sigma", () => {
 });
 
 test("cmcConfig: keyless by default, header when CMC_API_KEY set", () => {
-  assert.deepEqual(cmcConfig({}), { base: KEYLESS_BASE, headers: {} });
-  assert.deepEqual(cmcConfig({ CMC_API_KEY: "k" }), { base: KEYED_BASE, headers: { "X-CMC_PRO_API_KEY": "k" } });
+  assert.deepEqual(cmcConfig({}), { mode: "keyless", base: KEYLESS_BASE, headers: {} });
+  assert.deepEqual(cmcConfig({ CMC_API_KEY: "k" }), { mode: "keyed", base: KEYED_BASE, headers: { "X-CMC_PRO_API_KEY": "k" } });
 });
 
 const res = (status, body, headers = {}) => ({ status, ok: status < 300, headers: new Headers(headers), text: async () => JSON.stringify(body) });

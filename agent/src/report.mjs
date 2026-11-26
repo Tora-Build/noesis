@@ -59,15 +59,23 @@ export function analyze({ chain, snapshot, cournot = null, asset, opts = {} }) {
     title: marketTitle(asset, t, chain.deadline),
     asset,
     market: chain.market,
+    chainId: chain.chainId ?? null,
     generatedAt: new Date(chain.now * 1000).toISOString(),
+    // On-chain proof: the block every chain value was read at, so anyone can re-read it.
+    proof: {
+      chainId: chain.chainId ?? null, block: chain.block ?? null, blockHash: chain.blockHash ?? null, blockTimestamp: chain.now,
+      amm: chain.amm ?? null, ammState: { qYes: chain.qYes ?? null, qNo: chain.qNo ?? null, priceWad: chain.priceWad ?? null },
+      adjudicator: chain.adjudicator ?? null, feed: chain.feed ? { priceWad: chain.feed.priceWad ?? null, ts: chain.feed.ts } : null,
+    },
     inputs: {
-      sooth: { yesPrice: chain.yesPrice, qYes: chain.qYes, qNo: chain.qNo, tradingOpen: chain.tradingOpen, amm: chain.amm, phase: chain.phase ?? null },
+      sooth: { yesPrice: chain.yesPrice, qYes: chain.qYes, qNo: chain.qNo, priceWad: chain.priceWad ?? null, tradingOpen: chain.tradingOpen, amm: chain.amm, phase: chain.phase ?? null },
       terms: t ? { ...t, kindName: KIND_NAME[t.kind] } : null,
       deadline: chain.deadline,
       deadlineIso: new Date(chain.deadline * 1000).toISOString(),
       feed: chain.feed ?? null,
       spot, spotSource, touched,
       cmc: {
+        mode: snapshot.cmcMode ?? null, calls: snapshot.cmcCalls ?? [],
         spot: snapshot.spot, sigma: snapshot.sigma, sigmaSource: snapshot.sigmaSource,
         pct24h: snapshot.quote?.pct24h ?? null, pct7d: snapshot.quote?.pct7d ?? null, pct30d: snapshot.quote?.pct30d ?? null,
         fearGreed: snapshot.fearGreed, global: snapshot.global, candles: snapshot.candles, errors: snapshot.errors ?? [],
