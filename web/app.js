@@ -240,6 +240,7 @@ async function loadMarkets() {
   const list = cfg.markets ?? [];
   const res = await Promise.allSettled(list.map(readMarket));
   res.forEach((r, i) => { if (r.status === 'fulfilled') S.markets.set(list[i].market, r.value); });
+  if (list.length && !S.markets.size) throw res.find((r) => r.status === 'rejected')?.reason ?? new Error('No market could be read.');
   if (S.account) await loadPositions();
 }
 
@@ -342,19 +343,24 @@ async function loadHistory(asset) {
 // FeedObserved holds the feed price used for the result and the tx. Try one wide query,
 // then fall back to recent 5,000-block windows (public RPCs limit log ranges).
 async function loadObserved(m) {
-  if (m.observed || m.phase < PH.RESOLVED) return;
+  if (m.observed || m.phase < PH.RESOLVED || OBS_BUSY.has(m.addr)) return;
+  OBS_BUSY.add(m.addr);
+  try { await scanObserved(m); } finally { OBS_BUSY.delete(m.addr); }
+}
+const OBS_BUSY = new Set();
+async function scanObserved(m) {
   const from = BigInt(m.cfg.block ?? cfg.deployBlock ?? 0);
-  const q = (fromBlock, toBlock) => pub.getLogs({ address: cfg.adjudicator, event: FEED_OBSERVED, args: { market: m.addr }, fromBlock, toBlock });
+  const q = (fromBlock, toBlock) => logPub.getLogs({ address: cfg.adjudicator, event: FEED_OBSERVED, args: { market: m.addr }, fromBlock, toBlock });
   let logs = null;
   try { logs = await q(from, 'latest'); } catch {
-    const latest = S.block ?? await pub.getBlockNumber();
+    const latest = S.block ?? await logPub.getBlockNumber();
     for (let i = 0n, to = latest; i < 20n && to >= from; i++, to -= 5000n) {
       const lo = to - 4999n > from ? to - 4999n : from;
-      try { const l = await q(lo, to); if (l.length) { logs = l; break; } } catch { break; }
+      try { const l = await q(lo, to); if (l.length) { logs = l; break; } } catch { /* one window can fail: try the next */ }
     }
   }
   const l = logs?.at(-1);
-  if (l) m.observed = { price: wad(l.args.priceWad), ts: Number(l.args.publishedAt), outcome: Number(l.args.outcome), tx: l.transactionHash };
+  if (l) (S.markets.get(m.addr) ?? m).observed = m.observed = { price: wad(l.args.priceWad), ts: Number(l.args.publishedAt), outcome: Number(l.args.outcome), tx: l.transactionHash };
 }
 
 // ── Rendering ────────────────────────────────────────────────────────
@@ -873,7 +879,7 @@ function volText(c) {
   if (sd && num(sd.cmc) != null && num(sd.prior) != null) {
     return {
       parts: `CMC estimate ${pct(sd.cmc, 0)}, prior ${pct(sd.prior, 0)}, blended ${pct(sig, 0)}. Blend = √((CMC² + prior²) / 2).`,
-      how: 'From CMC price changes (1h to 90d windows). Tokenized stocks have no CMC DEX candles.',
+      how: 'From CMC price changes (24h to 90d windows). Tokenized stocks have no CMC DEX candles.',
     };
   }
   if (c.sigmaSource === 'realized_1d_candles') return { parts: `Realized volatility ${pct(sig, 0)}.`, how: `From ${c.candles?.count ?? 'the'} daily CMC DEX candles (/v1/k-line/candles).` };
@@ -955,10 +961,10 @@ const IMPL_ATLAS = 'https://github.com/Tora-Build/noesis/blob/main/agent/src/atl
 function consensusBlock(m) {
   const a = m.report?.inputs?.atlas;
   if (!a || a.state !== 'complete' || !a.consensusStatus) {
-    return `<div class="cons"><p class="cons-h">Atlas Consensus Score</p><p class="small muted">${a?.state === 'error' || a?.state === 'network_error' ? 'The last Atlas API read failed. The agent traded without it.' : 'Comes with the next agent report (every 30 min).'}</p></div>`;
+    return `<div class="cons"><p class="cons-h">Atlas Consensus Score</p><p class="small muted">${a?.state === 'error' || a?.state === 'network_error' ? 'The last Atlas API read failed, so the agent does not trade this level.' : a?.state === 'no_key' ? 'The Atlas API key is not set on the server. The agent trades without the score.' : a?.state === 'complete' ? 'Atlas returned no score for this feed, so the agent does not trade this level.' : 'Comes with the next agent report (every 30 min).'}</p></div>`;
   }
   const score = num(a.consensusScore), gap = num(a.onchainGapPct);
-  const rule = a.consensusStatus === 'HEALTHY' ? 'The agent trades at full size.' : a.consensusStatus === 'DEGRADED' ? 'The agent trades at half size.' : 'The agent does not trade.';
+  const rule = a.signatureValid === false ? 'The signature did not verify, so the agent does not trade.' : a.consensusStatus === 'HEALTHY' ? 'The agent trades at full size.' : a.consensusStatus === 'DEGRADED' ? 'The agent trades at half size.' : 'The agent does not trade.';
   return `<div class="cons">
       <div class="cons-top"><p class="cons-h">Atlas Consensus Score</p><span class="status ${CONS_CLS[a.consensusStatus] ?? 'bad'}">${esc(a.consensusStatus.replace('_', ' '))}</span></div>
       <p class="cons-score mono">${score != null ? esc(score.toFixed(2)) : '-'}<span class="muted"> / 1</span></p>
@@ -1006,10 +1012,11 @@ function agentReasons(r) {
   const risk = num(d.risk) ?? num(inp.model?.risk?.score), cap = num(p.riskCap);
   if (risk != null) out.push(`Risk score ${Math.round(risk)} of 100. ${cap != null ? `The cap is ${cap}, so the risk is ${risk >= cap ? 'at or above the cap: no trade' : 'under the cap'}.` : ''}`);
   const at = inp.atlas;
-  if (at?.state === 'complete' && at.consensusStatus) out.push(`Atlas Consensus ${at.consensusStatus} (${num(at.consensusScore)?.toFixed(2) ?? '-'}), signature ${at.signatureValid ? 'valid' : 'not valid'}. ${at.consensusStatus === 'HEALTHY' ? 'Full size allowed.' : at.consensusStatus === 'DEGRADED' ? 'Size is halved.' : 'No trade.'}`);
+  if (at?.state === 'complete' && at.consensusStatus) out.push(`Atlas Consensus ${at.consensusStatus} (${num(at.consensusScore)?.toFixed(2) ?? '-'}), signature ${at.signatureValid ? 'valid' : 'not valid'}. ${at.signatureValid === false ? 'No trade.' : at.consensusStatus === 'HEALTHY' ? 'Full size allowed.' : at.consensusStatus === 'DEGRADED' ? 'Size is halved.' : 'No trade.'}`);
   const pc = num(d.pCournot);
   out.push(pc != null ? `Cournot used: ${pct(pc)}, weight ${num(p.cournotWeight) ?? '-'}.` : `Cournot not used${inp.cournot?.state ? ` (${inp.cournot.state})` : ''}.`);
   if ((d.alerts ?? []).some((a) => (a?.code ?? a) === 'FEED_STALE')) out.push('The feed is old, so the agent holds. Atlas stock feeds pause when the stock market is closed.');
+  if (d.action === 'HOLD' && d.reason) out.push(`Decision: ${d.reason}`);
   if (num(d.sizeUsd)) out.push(`Size ${usd(d.sizeUsd)}${num(p.bankroll) ? ` of a ${usd(p.bankroll, 0)} bankroll` : ''}.`);
   return out;
 }

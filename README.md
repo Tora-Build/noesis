@@ -13,10 +13,10 @@ CoinMarketCap finds the risk. Cournot gives the odds, with evidence. The Atlas C
 1. **Markets on prices.** Each market asks a price question, for example "IWMB below $264 at 2026-12-01 05:00 UTC" or "BNB below $560 at 2026-12-01 05:00 UTC". It trades on a Sooth node on BSC mainnet (LMSR AMM and order book).
 2. **Settlement from the feed.** `PriceFeedAdjudicator` reads the Atlas Oracle MultiFeed (or a Chainlink-style feed) and proposes the outcome itself. Anyone can call `settleFromFeed`. By default there is no guardian and no veto window (`VETO_SECONDS=0`): only the feed decides. Then anyone calls `settle`.
 3. **The risk agent.** For each market the agent reads:
-   - CoinMarketCap: spot, Fear and Greed, global metrics, and volatility: realized from 30 daily DEX candles for BNB, or from 1h to 90d price changes for tokenized stocks (they have no DEX candles).
+   - CoinMarketCap: spot, Fear and Greed, global metrics, and volatility: realized from 30 daily DEX candles for BNB, or from 24h to 90d price changes for tokenized stocks (they have no DEX candles).
    - Cournot Intelligence Oracle: the probability of the same claim, with its evidence.
    - Sooth: the market's YES price.
-   - Atlas Pull API (Atlas markets): the signed Consensus Score. The agent checks the signature against the Atlas signer. HEALTHY: full size. DEGRADED: half size. WARNING, CRITICAL, SPLIT_MARKET, UNKNOWN or a bad signature: no trade. The key (`ATLAS_API_KEY`) stays on the server.
+   - Atlas Pull API (Atlas markets): the Consensus Score, read with our API key. The response's signed price payload is checked against the Atlas signer. If the API fails, the feed is missing or the data is more than 15 min old, the agent does not trade. HEALTHY: full size. DEGRADED: half size. WARNING, CRITICAL, SPLIT_MARKET, UNKNOWN or a bad signature: no trade. The key (`ATLAS_API_KEY`) stays on the server.
 
    It blends these into a fair probability and a risk score. If the gap to the Sooth price is larger than the threshold, it buys YES or NO with a capped Kelly size. Otherwise it holds. Each decision is written to a report with every input and the evidence.
 4. **The page.** `web/` shows each market with the feed price, the Sooth price, Cournot, the CMC model, the risk and the agent's decision. A wallet can trade, settle from the feed, finalize and claim.
@@ -43,7 +43,7 @@ Only feeds named at deployment can be used. They are part of the frozen profile 
 ## Run it
 
 ```sh
-git clone --recursive <this repo> && cd sooth-hedge
+git clone --recursive <this repo> && cd noesis
 npm install && (cd agent && npm install)
 
 # Contracts: build and test (the fork test needs BSC_RPC_URL)
@@ -145,7 +145,7 @@ npm run pages                  # build and push to the gh-pages branch of origin
 It builds from `contracts/deployments/56.json` (chain 56 only), with the public page RPC and the
 filtered reports, and force-pushes one commit to `gh-pages`. `main` and `develop` are not touched.
 Once, in GitHub: Settings, Pages, "Deploy from a branch", `gh-pages`, `/ (root)`. The page is then
-at `https://tora-build.github.io/sooth-hedge/`.
+at `https://tora-build.github.io/noesis/`. The live demo uses Cloudflare Pages: https://noesis-7fg.pages.dev
 
 ## Addresses (BSC mainnet)
 

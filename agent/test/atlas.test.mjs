@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseLatest, verifySignature, consensusGate, fetchConsensus, ATLAS_SIGNER } from "../src/atlas.mjs";
+import { parseLatest, verifySignature, consensusGate, atlasGate, fetchConsensus, ATLAS_SIGNER } from "../src/atlas.mjs";
 import { decide } from "../src/decide.mjs";
 
 // Example from the Atlas Pull API docs (feed 624).
@@ -78,4 +78,26 @@ test("fetchConsensus: a good response is parsed and its signature checked", asyn
   assert.equal(r.state, "complete");
   assert.equal(r.signatureValid, true);
   assert.equal(r.feeds["624"].consensusStatus, "HEALTHY");
+});
+
+test("atlasGate: fails closed on API error, missing feed or old data; no key leaves the trade unchanged", () => {
+  const now = 1_800_000_000;
+  assert.equal(atlasGate(null, now).applies, false);
+  assert.equal(atlasGate({ state: "no_key", feed: null }, now).applies, false);
+  for (const state of ["error", "network_error", "complete"]) {
+    const g = atlasGate({ state, feed: null }, now);
+    assert.equal(g.hold, true, state);
+    assert.match(g.reason, /unavailable/);
+  }
+  const old = atlasGate({ state: "complete", feed: { consensusStatus: "HEALTHY", consensusScore: 0.97, signatureValid: true, ts: now - 3600 } }, now);
+  assert.equal(old.hold, true);
+  assert.match(old.reason, /old/);
+  const fresh = atlasGate({ state: "complete", feed: { consensusStatus: "DEGRADED", consensusScore: 0.87, signatureValid: true, ts: now - 60 } }, now);
+  assert.equal(fresh.sizeMultiplier, 0.5);
+});
+
+test("decide: an Atlas API error means no trade", () => {
+  const d = decide({ pSooth: 0.25, pModel: 0.4, risk: 40, feedAgeSec: 10, consensus: atlasGate({ state: "error", feed: null }) });
+  assert.equal(d.action, "HOLD");
+  assert.match(d.reason, /unavailable/);
 });

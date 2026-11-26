@@ -77,6 +77,18 @@ export async function fetchConsensus(feedIds, { key = process.env.ATLAS_API_KEY,
  * HEALTHY: trade as usual. DEGRADED: half size. WARNING, CRITICAL, SPLIT_MARKET, UNKNOWN: no trade.
  * A response with a bad signature: no trade. No Atlas data (Chainlink markets, no key): no change.
  */
+/**
+ * Pure: the gate for an Atlas market from the whole fetch result { state, feed }.
+ * Fails closed: an API error, a missing feed or old data means no trade. Only "no_key"
+ * (the server runs without the Atlas key) leaves the trade unchanged.
+ */
+export function atlasGate(atlas, nowSec = Math.floor(Date.now() / 1000), maxAgeSec = 900) {
+  if (!atlas || atlas.state === "no_key" || atlas.state === "skipped") return consensusGate(null);
+  if (!atlas.feed) return { applies: true, sizeMultiplier: 0, hold: true, reason: `Atlas Consensus Score unavailable (${atlas.state === "complete" ? "feed missing" : atlas.state}): no trade.` };
+  if (atlas.feed.ts && nowSec - atlas.feed.ts > maxAgeSec) return { applies: true, sizeMultiplier: 0, hold: true, reason: `Atlas API data is ${Math.round((nowSec - atlas.feed.ts) / 60)} min old: no trade.` };
+  return consensusGate(atlas.feed);
+}
+
 export function consensusGate(atlas) {
   if (!atlas) return { applies: false, sizeMultiplier: 1, hold: false, reason: null };
   if (atlas.signatureValid === false) return { applies: true, sizeMultiplier: 0, hold: true, reason: "Atlas signature did not verify." };

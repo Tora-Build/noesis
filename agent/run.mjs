@@ -172,8 +172,10 @@ export async function runMarket({ client, market, amm, asset, snapshot, cournotM
   const atlasId = chain.terms?.source === 0 ? String(parseInt(chain.terms.feedId, 16)) : null;
   if (atlasId) {
     const res = atlasIn ?? await fetchConsensus([atlasId]);
-    atlas = { state: res.state, error: res.error ?? null, feed: res.feeds?.[atlasId] ?? null };
-    if (res.state === "complete") say(`Atlas consensus ${atlas.feed?.consensusStatus} (${atlas.feed?.consensusScore?.toFixed(2)}), signature ${atlas.feed?.signatureValid ? "valid" : "INVALID"}.`);
+    // Copy the feed: the bot shares one batched result across markets on the same feed.
+    atlas = { state: res.state, error: res.error ?? null, feed: res.feeds?.[atlasId] ? { ...res.feeds[atlasId] } : null };
+    if (res.state === "complete" && !atlas.feed) say(`Atlas returned no data for feed ${atlasId}.`);
+    else if (res.state === "complete") say(`Atlas consensus ${atlas.feed?.consensusStatus} (${atlas.feed?.consensusScore?.toFixed(2)}), signature ${atlas.feed?.signatureValid ? "valid" : "INVALID"}.`);
   }
   const report = analyze({ chain, snapshot, cournot: c, atlas, asset, opts: dOpts });
   report.mode = execute ? "execute" : "dry-run";

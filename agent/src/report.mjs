@@ -1,4 +1,4 @@
-import { consensusGate } from "./atlas.mjs";
+import { atlasGate } from "./atlas.mjs";
 // Pure pipeline: chain state + CMC snapshot + Cournot result -> report with decision.
 
 import { fairProbability, riskScore, KIND, KIND_NAME } from "./model.mjs";
@@ -46,7 +46,7 @@ export function analyze({ chain, snapshot, cournot = null, atlas = null, asset, 
   const decision = decide({
     pSooth: chain.yesPrice, pCournot, pModel, risk: risk.score,
     feedAgeSec: chain.feed?.ageSec ?? null, tradingOpen: chain.tradingOpen,
-    consensus: consensusGate(atlas?.feed ?? null),
+    consensus: atlasGate(atlas),
   }, opts);
   if (atlas?.feed?.price && chain.feed?.price) {
     const gap = Math.abs(atlas.feed.price - chain.feed.price) / chain.feed.price;

@@ -525,7 +525,7 @@ dialog::backdrop { background: rgba(11, 13, 18, .55); }
 @media (max-width: 980px) {
   .stage, .pair { grid-template-columns: 1fr; }
   /* One column: chances, market data, agent, oracle, settled. */
-  .cols { display: flex; flex-direction: column; }
+  .cols { display: flex; flex-direction: column; align-items: stretch; }
   .col { display: contents; }
   #chances { order: 1; } #intel { order: 2; } #agent { order: 3; } #oracle { order: 4; } #settled { order: 5; }
   .ro-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
