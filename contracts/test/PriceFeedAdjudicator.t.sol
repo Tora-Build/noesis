@@ -239,6 +239,86 @@ contract PriceFeedAdjudicatorTest is Test, HedgeSetup {
         vm.expectRevert(bytes("ONCE_A_DAY"));
         HedgeUSD(d.stable).faucet();
     }
+
+    function test_maxDelayCap() public {
+        NewMarket memory n;
+        n.question = "long window";
+        n.deadline = uint64(block.timestamp + 1 days);
+        n.terms = PriceFeedAdjudicator.Terms(0, address(atlas), IWMB, 1, 260e18, 1 hours + 1);
+        n.initialProbabilityWad = 0.3e18;
+        n.bBase = 100e18;
+        n.maxInput = 1000e18;
+        vm.expectRevert(PriceFeedAdjudicator.BadTerms.selector);
+        this.createExternal(n);
+    }
+
+    function test_close_windowEdges() public {
+        // A price published exactly at the deadline decides.
+        address m = _market(0, address(atlas), IWMB, 1, 270e18);
+        uint64 deadline = TruthMarket(m).deadline();
+        vm.warp(deadline);
+        atlas.set(IWMB, 270e18, deadline);
+        assertEq(adj.settleFromFeed(m), 1, "price == strike counts for close below");
+
+        // A price published exactly at deadline + maxDelay is still valid.
+        address m2 = _market(0, address(atlas), IWMB, 1, 260e18);
+        uint64 d2 = TruthMarket(m2).deadline();
+        vm.warp(d2 + 1 hours);
+        atlas.set(IWMB, 265e18, d2 + 1 hours);
+        assertEq(adj.settleFromFeed(m2), 0);
+
+        // A price published before the deadline cannot settle a close market.
+        address m3 = _market(0, address(atlas), IWMB, 1, 260e18);
+        vm.warp(TruthMarket(m3).deadline());
+        atlas.set(IWMB, 250e18, uint48(block.timestamp - 1));
+        vm.expectRevert(PriceFeedAdjudicator.StalePrice.selector);
+        adj.settleFromFeed(m3);
+    }
+}
+
+/// @notice The mainnet setup: veto period 0, no guardian. Only the feed decides.
+contract NoGuardianTest is Test, HedgeSetup {
+    address admin = makeAddr("admin");
+    address trader = makeAddr("trader");
+
+    function test_noGuardian_feedOnly() public {
+        vm.warp(1_800_000_000);
+        MockAtlas atlas = new MockAtlas();
+        bytes4 id = bytes4(uint32(1166));
+        atlas.set(id, 269e18, uint48(block.timestamp));
+        address[] memory feeds = new address[](1);
+        feeds[0] = address(atlas);
+        vm.startPrank(admin);
+        Deployment memory d = _deployAll(admin, address(0), 0, feeds);
+        HedgeUSD(d.stable).mint(admin, 10_000e18);
+        HedgeUSD(d.stable).approve(d.node.marketFactory, type(uint256).max);
+        NewMarket memory n;
+        n.question = "IWMB below 265";
+        n.deadline = uint64(block.timestamp + 1 days);
+        n.terms = PriceFeedAdjudicator.Terms(0, address(atlas), id, 1, 265e18, 5 minutes);
+        n.initialProbabilityWad = 0.3e18;
+        n.bBase = 100e18;
+        n.maxInput = 1000e18;
+        address m = _createMarket(d, n);
+        vm.stopPrank();
+
+        PriceFeedAdjudicator adj = PriceFeedAdjudicator(d.adjudicator);
+        assertEq(adj.guardians().length, 0, "no guardian");
+        assertEq(adj.vetoPeriod(), 0);
+
+        vm.warp(n.deadline + 30);
+        atlas.set(id, 264e18, uint48(block.timestamp));
+        assertEq(adj.settleFromFeed(m), 1);
+
+        // Nobody can veto, not even the admin.
+        vm.prank(admin);
+        vm.expectRevert();
+        adj.dispute(m);
+
+        // With no veto window the result can be finalized at once.
+        adj.settle(m);
+        assertTrue(TruthMarket(m).isSettled());
+    }
 }
 
 /// @notice Reads the real Atlas MultiFeed on a BSC mainnet fork. Runs only with BSC_RPC_URL.
@@ -248,7 +328,7 @@ contract AtlasForkTest is Test, HedgeSetup {
 
     function test_fork_realAtlasTouch() public {
         string memory rpc = vm.envOr("BSC_RPC_URL", string(""));
-        if (bytes(rpc).length == 0) return;
+        if (bytes(rpc).length == 0) vm.skip(true);
         vm.createSelectFork(rpc);
         address admin = makeAddr("admin");
         address[] memory feeds = new address[](1);

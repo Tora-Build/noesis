@@ -9,7 +9,9 @@ import {HedgeSetup} from "./HedgeSetup.sol";
 ///   PRIVATE_KEY=0x… forge script script/DeployHedge.s.sol --rpc-url bsc --broadcast
 ///
 /// Env: PRIVATE_KEY (required), STABLE (optional collateral; empty deploys the hUSD demo
-/// token), VETO_SECONDS (default 600). Writes deployments/<chainId>.json.
+/// token), VETO_SECONDS (default 0: no guardian, only the feed decides). Writes
+/// deployments/<chainId>.json. An anvil fork of BSC also has chain id 56: set
+/// DEPLOYMENT_FILE for fork runs so the mainnet file is never overwritten.
 contract DeployHedge is Script, HedgeSetup {
     /// Atlas Oracle push MultiFeed, BSC mainnet (atlasoracle.io/feeds).
     address constant ATLAS_MULTIFEED = 0xEAcE519ebB14fB8404fA6DdD23C3b34abaDE44aa;
@@ -21,7 +23,7 @@ contract DeployHedge is Script, HedgeSetup {
         uint256 key = vm.envUint("PRIVATE_KEY");
         address admin = vm.addr(key);
         address stable = vm.envOr("STABLE", address(0));
-        uint48 veto = uint48(vm.envOr("VETO_SECONDS", uint256(600)));
+        uint48 veto = uint48(vm.envOr("VETO_SECONDS", uint256(0)));
         address[] memory feeds = new address[](3);
         feeds[0] = ATLAS_MULTIFEED;
         feeds[1] = CHAINLINK_BNB_USD;
@@ -50,7 +52,10 @@ contract DeployHedge is Script, HedgeSetup {
         vm.serializeAddress(k, "chainlinkBtcUsd", CHAINLINK_BTC_USD);
         string memory out = vm.serializeAddress(k, "adjudicator", d.adjudicator);
         string memory path =
-            string.concat("deployments/", vm.toString(block.chainid), ".json");
+            vm.envOr(
+                "DEPLOYMENT_FILE",
+                string.concat("deployments/", vm.toString(block.chainid), ".json")
+            );
         vm.writeJson(out, path);
         console2.log("adjudicator", d.adjudicator);
         console2.log("marketFactory", d.node.marketFactory);
@@ -74,7 +79,10 @@ contract CreateMarket is Script, HedgeSetup {
     function run() external returns (address market) {
         uint256 key = vm.envUint("PRIVATE_KEY");
         string memory path =
-            string.concat("deployments/", vm.toString(block.chainid), ".json");
+            vm.envOr(
+                "DEPLOYMENT_FILE",
+                string.concat("deployments/", vm.toString(block.chainid), ".json")
+            );
         string memory json = vm.readFile(path);
         Deployment memory d;
         d.stable = vm.parseJsonAddress(json, ".stable");
@@ -90,8 +98,10 @@ contract CreateMarket is Script, HedgeSetup {
         m.terms.feed = vm.envAddress("FEED");
         m.terms.feedId = bytes4(uint32(vm.envOr("FEED_ID", uint256(0))));
         m.terms.kind = uint8(vm.envUint("KIND"));
+        // Touch markets can be bought and settled in one transaction after a cross.
+        require(m.terms.kind <= 1 || vm.envOr("ALLOW_TOUCH", false), "TOUCH_DISABLED");
         m.terms.strikeWad = vm.envUint("STRIKE");
-        m.terms.maxDelay = uint64(vm.envOr("MAX_DELAY", uint256(3600)));
+        m.terms.maxDelay = uint64(vm.envOr("MAX_DELAY", uint256(300)));
         m.initialProbabilityWad = vm.envUint("PROB");
         m.bBase = vm.envOr("BBASE", uint256(200e18));
         m.maxInput = vm.envOr("MAX_INPUT", uint256(1000e18));
