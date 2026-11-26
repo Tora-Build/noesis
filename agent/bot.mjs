@@ -51,7 +51,7 @@ export function readConfig(env = process.env) {
     skipDates: (env.BOT_SKIP_DATES || "").split(",").map((s) => s.trim()).filter(Boolean),
     publish: env.BOT_PUBLISH === "1",
     pagesProject: env.CF_PAGES_PROJECT || "noesis",
-    publishMinSec: num("BOT_PUBLISH_MIN_SEC", 3600),
+    publishMinSec: num("BOT_PUBLISH_MIN_SEC", 1800),
     dryRun: env.BOT_DRY_RUN !== "0", // dry by default: set BOT_DRY_RUN=0 to send
     settleSec: num("BOT_SETTLE_SEC", 60),
     agentSec: num("BOT_AGENT_SEC", 900),
@@ -184,7 +184,8 @@ export async function startBot(env = process.env) {
       }
       save();
     }
-    if (traded) { state.publish.due = true; save(); }
+    // Fresh reports (CMC data, fair prices) after every run: publish them, at most every BOT_PUBLISH_MIN_SEC.
+    state.publish.due = true; save();
   }
 
   // ── Creator ──
