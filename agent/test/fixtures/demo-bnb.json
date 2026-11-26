@@ -1,0 +1,45 @@
+{
+  "description": "Demo: BNB touch-above $600 by Dec 1 2026. Real CMC captures from 2026-11-26. Chain state and Cournot probability are fixtures.",
+  "asset": "BNB",
+  "cournotId": 113195,
+  "cmcFiles": {
+    "quotes": "cmc-quotes.json",
+    "candles": "cmc-candles.json",
+    "fearGreed": "cmc-fng.json",
+    "global": "cmc-global.json"
+  },
+  "cournotFile": "cournot-probability.json",
+  "chain": {
+    "market": "0x5ee0000000000000000000000000000000000b4b",
+    "amm": "0xa000000000000000000000000000000000000a11",
+    "adjudicator": "0xad00000000000000000000000000000000000001",
+    "deadline": 1796101200,
+    "now": 1795680000,
+    "tradingOpen": true,
+    "settled": false,
+    "phase": "ACTIVE",
+    "openedAt": 1795420800,
+    "yesPrice": 0.41,
+    "qYes": "1200000000000000000000",
+    "qNo": "800000000000000000000",
+    "decimals": 18,
+    "terms": {
+      "source": 1,
+      "feed": "0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE",
+      "feedId": "0x00000000",
+      "kind": 2,
+      "strike": 600,
+      "strikeWad": "600000000000000000000",
+      "maxDelay": 0
+    },
+    "feed": {
+      "price": 554.02,
+      "priceWad": "554020000000000000000",
+      "ts": 1795679955,
+      "ageSec": 45
+    }
+  },
+  "decideOpts": {
+    "bankroll": 100
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "code": 402,
+  "msg": "payment required",
+  "data": {
+    "x402Version": 2
+  }
+}

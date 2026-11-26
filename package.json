@@ -1,0 +1,12 @@
+{
+  "name": "sooth-hedge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "web:config": "node scripts/build-web.mjs",
+    "web": "node scripts/build-web.mjs && npx --yes http-server@14.1.1 web -p 8080 -c-1"
+  },
+  "dependencies": {
+    "viem": "2.21.0"
+  }
+}

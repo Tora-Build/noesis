@@ -1,0 +1,15 @@
+{
+  "name": "sooth-hedge-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sooth Hedge risk agent: CoinMarketCap finds risk, Cournot gives evidence, Sooth prices it, the agent decides.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "demo": "node run.mjs --offline --fixture test/fixtures/demo-bnb.json"
+  },
+  "dependencies": {
+    "viem": "2.45.1"
+  }
+}

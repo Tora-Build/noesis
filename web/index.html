@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sooth Hedge</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <strong>Sooth Hedge</strong>
+      <span>Risk markets for agents on BNB Chain</span>
+    </div>
+    <div class="wallet">
+      <button id="faucet" hidden>Get 1,000 hUSD</button>
+      <button id="connect">Connect wallet</button>
+    </div>
+  </header>
+
+  <section class="flow">
+    <div><b>CoinMarketCap</b><span>finds the risk</span></div>
+    <div><b>Cournot</b><span>gives the odds, with evidence</span></div>
+    <div><b>Sooth</b><span>prices and trades it</span></div>
+    <div><b>Atlas</b><span>settles it on-chain</span></div>
+  </section>
+
+  <main id="markets"><p class="muted">Loading markets…</p></main>
+
+  <footer>
+    <span id="net" class="muted"></span>
+    <span class="muted">Demo collateral hUSD has no value.</span>
+  </footer>
+
+  <template id="card">
+    <article class="card">
+      <div class="top">
+        <span class="badge src"></span>
+        <span class="badge kind"></span>
+        <span class="muted due"></span>
+      </div>
+      <h2 class="q"></h2>
+      <div class="nums">
+        <div><label>Feed price</label><b class="feed"></b><small class="feedAge muted"></small></div>
+        <div><label>Strike</label><b class="strike"></b></div>
+        <div><label>Sooth YES</label><b class="sooth"></b></div>
+        <div><label>Cournot</label><b class="cournot">–</b></div>
+        <div><label>CMC model</label><b class="model">–</b></div>
+        <div><label>Risk</label><b class="risk">–</b></div>
+      </div>
+      <div class="agent" hidden>
+        <div class="decision"></div>
+        <ul class="alerts"></ul>
+        <details class="evidence"><summary>Evidence</summary><ul></ul></details>
+      </div>
+      <div class="actions">
+        <input class="amt" type="number" min="1" step="1" value="10" aria-label="Shares">
+        <button class="buyYes">Buy YES</button>
+        <button class="buyNo">Buy NO</button>
+        <button class="settleFeed">Settle from feed</button>
+        <button class="finalize" hidden>Finalize</button>
+        <button class="claim" hidden>Claim</button>
+      </div>
+      <div class="status muted"></div>
+    </article>
+  </template>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

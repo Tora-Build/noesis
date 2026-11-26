@@ -1,0 +1,62 @@
+{
+  "code": 0,
+  "msg": "Success",
+  "data": {
+    "probability": {
+      "result": {
+        "point_estimate": 0.22,
+        "range": [
+          0.15,
+          0.3
+        ],
+        "confidence": "medium",
+        "direction": "below_market"
+      },
+      "basis": {
+        "primary_anchor": {
+          "source": "Polymarket",
+          "market": "BNB above $600 in November?",
+          "displayed_probability": 0.24,
+          "volume_usd": 2813626,
+          "time": "2026-11-26T07:40:00Z"
+        },
+        "price_distance": {
+          "spot_price": 554.02,
+          "target_price": 600,
+          "required_return": 0.083,
+          "days_remaining": 4.9
+        },
+        "cross_checks": [
+          {
+            "source": "CoinMarketCap",
+            "summary": "BNB 24h change +2.8%, 30d change -24.7%",
+            "url": "https://coinmarketcap.com/currencies/bnb/",
+            "time": "2026-11-26T07:56:03Z"
+          },
+          {
+            "source": "Deribit",
+            "summary": "Implied vol for BNB-linked options near 58% annualized",
+            "time": "2026-11-26T07:30:00Z"
+          }
+        ],
+        "limitations": [
+          "Short window; a single news event can move BNB 8% in days.",
+          "Fixture built from response-format.md, not a live call."
+        ]
+      }
+    },
+    "markets": [
+      {
+        "id": 113195,
+        "title": "BNB price above $600.00 at any time before 2026-12-01 05:00 UTC",
+        "market_outcome_price": 0.24
+      }
+    ],
+    "billing": "free_quota",
+    "free_quota": {
+      "remaining": 2,
+      "ip": "203.0.113.7"
+    },
+    "charged": false
+  }
+}

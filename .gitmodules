@@ -1,0 +1,6 @@
+[submodule "contracts/lib/sooth-factory"]
+	path = contracts/lib/sooth-factory
+	url = https://github.com/Tora-Build/sooth-factory
+[submodule "contracts/lib/forge-std"]
+	path = contracts/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
