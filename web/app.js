@@ -1291,7 +1291,7 @@ async function openConfirm() {
   const low = legs.at(-1).strike, top = legs[0].strike;
   const prem = wad(maxCost), quoteNow = wad(net);
   $('#cfWhat').textContent = q.stair
-    ? `You get up to ${money(q.payout)} as ${q.asset} falls to ${usd(low)} at the deadline, ${when(q.deadline)}. Above ${usd(top)} you get $0. The ${SRC_LONG[q.source]} price settles it.`
+    ? `You get up to ${money(q.payout)} if ${q.asset} ends at or below ${usd(low)} at the deadline, ${when(q.deadline)}. Above ${usd(top)} you get $0. The ${SRC_LONG[q.source]} price settles it.`
     : `You get ${money(q.payout)} if ${q.asset} is at or below ${usd(low)} at the deadline, ${when(q.deadline)}. Above it you get $0. The ${SRC_LONG[q.source]} price settles it.`;
   // Price impact: the AMM price now against the average price this order pays.
   const shares = legs.reduce((s, l) => s + l.sharesNum, 0);
@@ -1374,7 +1374,7 @@ async function runProtect() {
     setMsgHtml('#cfMsg', `Protected. ${link(txUrl(lastHash), 'View tx')}`, 'ok');
     go.textContent = 'Done';
     setTimeout(() => $('#confirm').close(), 1400);
-    toast(`Protected: ${q.stair ? 'up to ' : ''}${esc(money(q.payout))} if ${esc(q.asset)} falls to ${usd(q.legs.at(-1).strike)}. ${link(txUrl(lastHash), 'View tx')}`);
+    toast(`Protected: ${q.stair ? 'up to ' : ''}${esc(money(q.payout))} if ${esc(q.asset)} ends at or below ${usd(q.stair ? q.legs[0].strike : q.legs.at(-1).strike)} at the deadline. ${link(txUrl(lastHash), 'View tx')}`);
   } catch (e) {
     setMsg('#cfMsg', `${humanError(e)}${cfDone.size ? ` ${cfDone.size} of ${q.legs.length} levels are bought.` : ''}`, 'err');
     go.disabled = false; go.textContent = cfDone.size ? 'Buy the rest' : 'Try again';
