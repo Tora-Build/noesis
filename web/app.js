@@ -945,6 +945,29 @@ function oracleStatus(m) {
   if (s.kind === 'settled') return ['done', m.outcome === 2 ? 'Settled void' : `Settled ${OUTCOME[m.outcome] ?? ''}`];
   return ['wait', 'Waiting for settlement'];
 }
+// Atlas Consensus Score, from the agent's signed Atlas API read (the key stays on the server).
+const CONS_CLS = { HEALTHY: 'done', DEGRADED: 'wait' };
+const IMPL_ATLAS = 'https://github.com/Tora-Build/noesis/blob/main/agent/src/atlas.mjs';
+function consensusBlock(m) {
+  const a = m.report?.inputs?.atlas;
+  if (!a || a.state !== 'complete' || !a.consensusStatus) {
+    return `<div class="cons"><p class="cons-h">Atlas Consensus Score</p><p class="small muted">${a?.state === 'error' || a?.state === 'network_error' ? 'The last Atlas API read failed. The agent traded without it.' : 'Comes with the next agent report (every 30 min).'}</p></div>`;
+  }
+  const score = num(a.consensusScore), gap = num(a.onchainGapPct);
+  const rule = a.consensusStatus === 'HEALTHY' ? 'The agent trades at full size.' : a.consensusStatus === 'DEGRADED' ? 'The agent trades at half size.' : 'The agent does not trade.';
+  return `<div class="cons">
+      <div class="cons-top"><p class="cons-h">Atlas Consensus Score</p><span class="status ${CONS_CLS[a.consensusStatus] ?? 'bad'}">${esc(a.consensusStatus.replace('_', ' '))}</span></div>
+      <p class="cons-score mono">${score != null ? esc(score.toFixed(2)) : '-'}<span class="muted"> / 1</span></p>
+      <p class="small">${esc(rule)}</p>
+      <dl class="kv or-kv small">
+        <dt>Atlas API price</dt><dd class="mono">${a.price != null ? esc(usd(a.price)) : '-'}${gap != null ? ` <span class="muted">(${esc(gap.toFixed(3))}% from on chain)</span>` : ''}</dd>
+        <dt>TWAP</dt><dd class="mono">${a.twapPrice != null ? esc(usd(a.twapPrice)) : '-'}</dd>
+        <dt>Signature</dt><dd>${a.signatureValid ? `Valid, signer ${esc(short(a.signer ?? ''))}` : '<b>Did not verify</b>'}</dd>
+        <dt>Read</dt><dd>${a.fetchedAt ? `${esc(when(Math.floor(Date.parse(a.fetchedAt) / 1000)))}, ${esc(ago(Math.floor(Date.parse(a.fetchedAt) / 1000)))}` : '-'} · <code>POST /v1/price/latest</code></dd>
+      </dl>
+      <p class="small">${link(IMPL_ATLAS, 'Implementation')}</p>
+    </div>`;
+}
 function renderOracle() {
   const m = S.markets.get(S.sel), body = $('#orBody');
   if (!m) { body.innerHTML = `<p class="empty">${S.markets.size ? 'Pick a level.' : '<span class="skel skel-w"></span>'}</p>`; return; }
@@ -964,6 +987,7 @@ function renderOracle() {
       <dt>Level</dt><dd>${esc(usd(m.strike))}, at the deadline ${esc(when(m.deadline))}</dd>
       ${o ? `<dt>Price used</dt><dd class="mono">${esc(usd(o.price))} <span class="muted">at ${esc(when(o.ts))}</span></dd><dt>Settlement tx</dt><dd>${link(txUrl(o.tx), short(o.tx))}</dd>` : ''}
     </dl>
+    ${m.source === 0 ? consensusBlock(m) : ''}
     <p class="or-rule">At the deadline, anyone can call settle; the contract reads this feed; the price must be at most ${esc(String(m.maxDelay))} s old; no person can change the result.</p>
     <p class="small">${link(IMPL_ADJ, 'Implementation')} · ${link(addrUrl(cfg.adjudicator), 'Adjudicator contract')}</p>`;
 }
@@ -977,6 +1001,8 @@ function agentReasons(r) {
   if (e != null) out.push(`Edge ${signed(e * 100, 1)}: agent estimate ${pct(num(d.pStar))} minus market price ${pct(num(d.pSooth))}. ${th != null ? `The threshold is ${pct(th)}, so the edge is ${Math.abs(e) > th ? 'outside it: a trade is allowed' : 'inside it: no trade'}.` : ''}`);
   const risk = num(d.risk) ?? num(inp.model?.risk?.score), cap = num(p.riskCap);
   if (risk != null) out.push(`Risk score ${Math.round(risk)} of 100. ${cap != null ? `The cap is ${cap}, so the risk is ${risk >= cap ? 'at or above the cap: no trade' : 'under the cap'}.` : ''}`);
+  const at = inp.atlas;
+  if (at?.state === 'complete' && at.consensusStatus) out.push(`Atlas Consensus ${at.consensusStatus} (${num(at.consensusScore)?.toFixed(2) ?? '-'}), signature ${at.signatureValid ? 'valid' : 'not valid'}. ${at.consensusStatus === 'HEALTHY' ? 'Full size allowed.' : at.consensusStatus === 'DEGRADED' ? 'Size is halved.' : 'No trade.'}`);
   const pc = num(d.pCournot);
   out.push(pc != null ? `Cournot used: ${pct(pc)}, weight ${num(p.cournotWeight) ?? '-'}.` : `Cournot not used${inp.cournot?.state ? ` (${inp.cournot.state})` : ''}.`);
   if ((d.alerts ?? []).some((a) => (a?.code ?? a) === 'FEED_STALE')) out.push('The feed is old, so the agent holds. Atlas stock feeds pause when the stock market is closed.');

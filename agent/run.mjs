@@ -4,6 +4,7 @@
 //   node run.mjs --offline --fixture <file>
 // Reads agent/.env and ../.env (values never printed). `node --env-file=../.env run.mjs …` also works.
 
+import { fetchConsensus } from "./src/atlas.mjs";
 import { parseArgs } from "node:util";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
@@ -135,7 +136,7 @@ async function runOnline() {
  * @param {(req: object) => Promise<object>} [o.prepare] adds gas fields to each tx before it is sent
  */
 export async function runMarket({ client, market, amm, asset, snapshot, cournotMode = "resolve", cournotMessage, decideOpts: dOpts = {},
-  slippage = 0.02, account = null, wallet = null, execute = false, maxSpendUsd = null, prepare, log: say = () => {}, chain: chainIn } = {}) {
+  slippage = 0.02, account = null, wallet = null, execute = false, maxSpendUsd = null, prepare, log: say = () => {}, chain: chainIn, atlas: atlasIn } = {}) {
   say("Reading Sooth market…");
   const chain = chainIn ?? await readMarket(client, market, { amm });
   chain.chainId ??= await client.getChainId();
@@ -166,7 +167,15 @@ export async function runMarket({ client, market, amm, asset, snapshot, cournotM
     }
   }
 
-  const report = analyze({ chain, snapshot, cournot: c, asset, opts: dOpts });
+  // Atlas Consensus Score for Atlas feeds (source 0). The bot passes one batched result in; the CLI fetches its own.
+  let atlas = null;
+  const atlasId = chain.terms?.source === 0 ? String(parseInt(chain.terms.feedId, 16)) : null;
+  if (atlasId) {
+    const res = atlasIn ?? await fetchConsensus([atlasId]);
+    atlas = { state: res.state, error: res.error ?? null, feed: res.feeds?.[atlasId] ?? null };
+    if (res.state === "complete") say(`Atlas consensus ${atlas.feed?.consensusStatus} (${atlas.feed?.consensusScore?.toFixed(2)}), signature ${atlas.feed?.signatureValid ? "valid" : "INVALID"}.`);
+  }
+  const report = analyze({ chain, snapshot, cournot: c, atlas, asset, opts: dOpts });
   report.mode = execute ? "execute" : "dry-run";
   report.cournotMessage = message;
   if (c.resolveCandidates) report.inputs.cournot.resolveCandidates = c.resolveCandidates;
