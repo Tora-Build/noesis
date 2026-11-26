@@ -1,4 +1,4 @@
-// Sooth Hedge page. All numbers come from the chain (config.json lists the markets) or from
+// NOESIS page. All numbers come from the chain (config.json lists the markets) or from
 // the risk agent's reports (reports/<market>.json). If a value is missing, the page says so.
 import {
   createPublicClient, createWalletClient, custom, http, parseAbi, parseAbiItem, formatUnits, parseUnits, defineChain, toHex,
@@ -384,6 +384,9 @@ function renderAll() {
   renderRule();
   renderSettled();
   renderMine();
+  renderPaths();
+  renderPortfolio();
+  renderLive();
 }
 
 function pickDefaults() {
@@ -653,6 +656,7 @@ function drawChart() {
   o.push(`<rect class="hit" x="0" y="0" width="${W}" height="${H}"/>`);
   o.push(`<g id="floorG" class="floor" role="slider" tabindex="0" aria-orientation="vertical" aria-label="Floor price">
     <line class="fl-halo" x1="0" x2="${xq1}" y1="0" y2="0"/>
+    <line class="fl-edge" x1="0" x2="${xq1}" y1="0" y2="0"/>
     <line class="fl" x1="0" x2="${xq1}" y1="0" y2="0"/>
     <rect class="fl-ring" x="${xp1 - 2}" y="-17" width="${labW + 4}" height="34" rx="17"/>
     <rect class="fl-grab" x="${xp1 + 2}" y="-13" width="${labW - 4}" height="26" rx="13"/>
@@ -730,6 +734,7 @@ function setFloor(addr, animate = true) {
   renderTrader();
   renderAgent();
   renderRule();
+  renderPaths();
 }
 
 function stepFloor(dir) {
@@ -783,7 +788,7 @@ function renderLadder() {
     const d = m.report?.decision;
     const dist = ap ? (m.strike / ap.price - 1) * 100 : null;
     const you = m.pos && (m.pos.yes > 0 || m.pos.no > 0) ? `${m.pos.yes > 0 ? usd(m.pos.yes) : ''}${m.pos.no > 0 ? `<span class="gap-note">${m.pos.no.toFixed(2)} NO</span>` : ''}` : '<span class="muted">-</span>';
-    const fair = d?.pModel, cour = cournotOf(m);
+    const fair = fairOf(m), cour = cournotOf(m);
     const inLeg = S.plan?.legs?.some((l) => l.m.addr === m.addr);
     return `<tr tabindex="0" data-m="${esc(m.addr)}" aria-selected="${m.addr === S.sel}"${inLeg && m.addr !== S.sel ? ' class="leg"' : ''}>
       <td><span class="lvl">${usd(m.strike)}</span>${dls.length > 1 ? `<span class="kind">${esc(endLabel(m.deadline))}</span>` : ''}</td>
@@ -944,6 +949,102 @@ function renderMine() {
   $('#mineList').innerHTML = rows.map((m) => `<li><span class="mono">${usd(m.pos.yes)}</span><span>${esc(ifText(m))}</span></li>`).join('');
 }
 
+// ── Multi-path outcomes: from the price now to each open level ──────
+// Only real numbers: the feed price, the level, the AMM price (p) and the agent's fair price.
+function fairOf(m) { return num(m?.report?.decision?.pStar) ?? num(m?.report?.decision?.pModel); }
+const p2 = (p) => (p == null || !Number.isFinite(p) ? '-' : p.toFixed(2));
+
+function renderPaths() {
+  const svg = $('#pathsSvg'), box = $('#pathsPlot'), msg = $('#pathsMsg');
+  const ap = S.asset && assetPrice(S.asset), lv = levels();
+  $('#pathsWhen').textContent = S.asset && S.end ? `${S.asset}, ends ${endLabel(S.end)} UTC` : '';
+  if (!S.markets.size || !ap || !lv.length) {
+    svg.innerHTML = '<title id="pathsTitle">Outcome paths</title>';
+    svg.setAttribute('height', '0');
+    msg.hidden = false;
+    msg.innerHTML = !S.markets.size ? '<span class="skel skel-w"></span>' : !ap ? 'No feed price for this asset.' : 'No open levels for this end time.';
+    return;
+  }
+  msg.hidden = true;
+  const W = Math.max(280, Math.round(box.clientWidth || 440));
+  const n = lv.length, rowH = 40;
+  const H = Math.max(260, n * rowH + 72);
+  const labW = W < 400 ? 112 : 136, padT = 20, padB = 32;
+  const x0 = 6, x1 = W - labW - 16;
+  const vals = [ap.price, ...lv.map((m) => m.strike)];
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo || ap.price * 0.02) * 0.1; lo -= pad; hi += pad;
+  const y = (v) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+  const y0 = y(ap.price);
+  // Labels: at the level, pushed apart so they never overlap.
+  const ys = lv.map((m) => y(m.strike));
+  const ly = [];
+  ys.forEach((v, i) => { ly.push(Math.max(v, i ? ly[i - 1] + rowH : padT)); });
+  const over = (ly.at(-1) ?? 0) - (H - padB + 4);
+  if (over > 0) for (let i = ly.length - 1; i >= 0; i--) ly[i] = Math.min(ly[i] - over, i < ly.length - 1 ? ly[i + 1] - rowH : Infinity);
+  const on = new Set(S.plan?.legs?.map((l) => l.m.addr) ?? [S.sel]);
+  const curve = (yk) => `M${x0},${y0.toFixed(1)}C${(x0 + (x1 - x0) * 0.45).toFixed(1)},${y0.toFixed(1)} ${(x0 + (x1 - x0) * 0.55).toFixed(1)},${yk.toFixed(1)} ${x1},${yk.toFixed(1)}`;
+  const o = [];
+  o.push(`<title id="pathsTitle">${esc(`Paths from ${S.asset} ${usd(ap.price)} now to ${n} level${n > 1 ? 's' : ''} at ${when(S.end)}. `
+    + lv.map((m) => `${usd(m.strike)}: p ${p2(m.yes)}, fair ${p2(fairOf(m))}`).join('; '))}</title>`);
+  o.push(`<line class="mp-base" x1="${x0}" x2="${x1}" y1="${y0}" y2="${y0}"/>`);
+  for (const yk of ys) o.push(`<path class="mp-fan" d="${curve(yk)}L${x1},${y0.toFixed(1)}Z"/>`);
+  lv.forEach((m, i) => o.push(`<path class="mp-l${on.has(m.addr) ? ' on' : ''}" d="${curve(ys[i])}"/>`));
+  lv.forEach((m, i) => {
+    const sel = on.has(m.addr), lx = x1 + 12;
+    if (Math.abs(ly[i] - ys[i]) > 1) o.push(`<path class="mp-l" d="M${x1 + 4},${ys[i].toFixed(1)}L${lx - 4},${ly[i].toFixed(1)}"/>`);
+    o.push(`<circle class="mp-end${sel ? ' on' : ''}" cx="${x1}" cy="${ys[i].toFixed(1)}" r="${sel ? 4.5 : 3.5}"/>`);
+    o.push(`<text class="mp-p" x="${lx}" y="${(ly[i] - 1).toFixed(1)}">p = ${p2(m.yes)}</text>`);
+    o.push(`<text class="mp-f" x="${lx}" y="${(ly[i] + 13).toFixed(1)}">${esc(usd(m.strike, m.strike >= 100 ? 0 : 2))} · fair ${p2(fairOf(m))}</text>`);
+  });
+  o.push(`<circle class="mp-o" cx="${x0}" cy="${y0}" r="4.5"/>`);
+  o.push(`<text class="mp-ax" x="${x0}" y="${y0 < H / 2 ? y0 - 10 : y0 + 18}">${esc(usd(ap.price))} now</text>`);
+  o.push(`<text class="mp-ax" x="${x1}" y="${H - 8}" text-anchor="end">${esc(endLabel(S.end))} UTC</text>`);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('height', String(H));
+  svg.innerHTML = o.join('');
+}
+
+// ── Portfolio: what the wallet really holds, valued at the live feed price ──
+const FOLIO = ['IWMB', 'EWZB', 'BNB'];
+function renderPortfolio() {
+  const box = $('#folio');
+  box.hidden = !S.account;
+  if (!S.account) return;
+  const held = FOLIO.filter((a) => S.hold[a] > 0);
+  const known = FOLIO.filter((a) => S.hold[a] != null);
+  let total = 0, priced = 0;
+  if (!known.length) {
+    $('#folioNote').textContent = '';
+    $('#folioBody').innerHTML = '<p class="folio-none">Reading your balances.</p>';
+    return;
+  }
+  if (!held.length) {
+    $('#folioNote').textContent = '';
+    $('#folioBody').innerHTML = `<p class="folio-none">This wallet holds no ${esc(known.join(', ').replace(/, ([^,]*)$/, ' or $1'))}. You can still set a floor with any amount.</p>`;
+    return;
+  }
+  $('#folioBody').innerHTML = `<ul class="folio-list">${held.map((a) => {
+    const n = S.hold[a], ap = assetPrice(a), v = ap ? n * ap.price : null;
+    if (v != null) { total += v; priced++; }
+    const can = (S.assets ?? []).includes(a);
+    return `<li><span class="f-asset">${esc(a)} <span class="f-qty">${esc(fmtQty(n))}</span></span>
+      <span class="f-val">${v != null ? esc(usd(v)) : '<span class="muted small">No feed price</span>'}</span>
+      <span class="f-act">${can ? `<button type="button" class="btn btn-sm${a === S.asset ? ' btn-ink' : ''}" data-folio="${esc(a)}" aria-label="Protect your ${esc(a)}">${a === S.asset ? 'Selected' : 'Protect'}</button>` : '<span class="small muted">No open levels</span>'}</span></li>`;
+  }).join('')}</ul>`;
+  $('#folioNote').textContent = priced ? `${usd(total)} at live feed prices` : '';
+}
+
+// Live line in the hero: real counts from the chain.
+function renderLive() {
+  const ms = [...S.markets.values()];
+  if (!ms.length) return;
+  const open = ms.filter(live).length;
+  const assets = S.assets ?? [];
+  const list = assets.length > 1 ? `${assets.slice(0, -1).join(', ')} and ${assets.at(-1)}` : assets[0] ?? '';
+  $('#heroLive').innerHTML = `<i class="dot live" aria-hidden="true"></i><span>Live on BNB Chain. <b>${open}</b> open market${open === 1 ? '' : 's'}${list ? ` on ${esc(list)}` : ''}.</span>`;
+}
+
 function renderWallet() {
   const b = $('#connect');
   b.textContent = S.account ? `${S.balance != null ? `${usd(S.balance)} hUSD-DEMO · ` : ''}${short(S.account)}` : 'Connect wallet';
@@ -980,6 +1081,7 @@ const walletClient = () => createWalletClient({ chain, transport: custom(window.
 function resetWallet() {
   S.wallet = null; S.account = null; S.balance = null; S.hold = {}; S.cover = null;
   renderWallet();
+  renderPortfolio();
 }
 
 // Make sure the wallet is on our chain. Ask to switch, add the chain if the wallet does not know
@@ -1174,7 +1276,7 @@ $('#faucet').onclick = faucet;
 document.querySelectorAll('[data-faucet]').forEach((b) => { b.hidden = !cfg.faucet; b.onclick = faucet; });
 $('#assetSeg').addEventListener('change', (e) => { S.asset = e.target.value; S.end = null; S.sel = null; S.cover = null; renderAll(); });
 $('#endSeg').addEventListener('change', (e) => { S.end = Number(e.target.value); S.sel = null; renderAll(); });
-$('#modeSeg').addEventListener('change', (e) => { S.mode = e.target.value; renderPlan(); renderLadder(); renderRule(); });
+$('#modeSeg').addEventListener('change', (e) => { S.mode = e.target.value; renderPlan(); renderLadder(); renderRule(); renderPaths(); });
 $('#amt').addEventListener('input', (e) => { S.cover = null; S.amount = Number(e.target.value); renderPlan(); });
 document.querySelectorAll('.chip[data-amt]').forEach((c) => { c.onclick = () => { S.cover = null; S.amount = Number(c.dataset.amt); $('#amt').value = c.dataset.amt; renderPlan(); }; });
 $('#coverBtn').onclick = () => {
@@ -1189,6 +1291,16 @@ $('#tShares').oninput = traderQuote;
 $('#trader').addEventListener('toggle', () => { if ($('#trader').open) traderQuote(); });
 document.querySelectorAll('input[name=side]').forEach((r) => { r.onchange = traderQuote; });
 $('#tBuy').onclick = traderBuy;
+
+// "Protect" in the portfolio strip: pick that asset in the main flow and go to the chart.
+$('#folioBody').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-folio]');
+  if (!b) return;
+  S.asset = b.dataset.folio; S.end = null; S.sel = null; S.cover = null;
+  renderAll();
+  $('#protect').scrollIntoView({ behavior: calm.matches ? 'auto' : 'smooth', block: 'start' });
+  document.querySelector(`#assetSeg input[value="${CSS.escape(S.asset)}"]`)?.focus({ preventScroll: true });
+});
 
 // Drag the floor: pointer (mouse, pen, touch) anywhere on the chart, or the keyboard on the line.
 const svgEl = $('#svg');
@@ -1239,7 +1351,7 @@ window.ethereum?.on?.('accountsChanged', (a) => {
   loadPositions().then(renderAll).catch(() => {});
 });
 window.ethereum?.on?.('chainChanged', () => location.reload());
-let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!drag) drawChart(); }, 120); });
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (!drag) { drawChart(); renderPaths(); } }, 120); });
 
 // ── Start ────────────────────────────────────────────────────────────
 async function refresh() {
@@ -1252,6 +1364,7 @@ async function refresh() {
   } catch (e) {
     $('#net .dot').className = 'dot err';
     $('#block').textContent = 'RPC error';
+    if (!S.markets.size) $('#heroLive').textContent = 'Cannot reach BNB Chain right now. The page tries again in 30 s.';
     if (!S.markets.size) {
       $('#setList').innerHTML = `<li class="empty">Cannot reach the chain: ${esc(humanError(e))}</li>`;
       const msg = $('#plotMsg'); msg.hidden = false; msg.textContent = 'Cannot reach the chain. The page tries again in 30 s.';
