@@ -32,7 +32,7 @@ export function keeperPlan({ now, deadline, terms, feed, openedAt = 0, phase, se
   return { action: "SETTLE_FROM_FEED", reason: touch ? "Deadline passed with no touch: NO." : "Deadline passed. Read the close." };
 }
 
-async function readState(client, market) {
+export async function readState(client, market) {
   const call = (address, abi, functionName, args = []) => client.readContract({ address, abi, functionName, args });
   const [deadline, adjudicator, settled, block] = await Promise.all([
     call(market, marketAbi, "deadline"), call(market, marketAbi, "adjudicator"), call(market, marketAbi, "isSettled"), client.getBlock(),
@@ -66,17 +66,19 @@ export function parseLoop(v) {
  * One keeper step for one market. `pending` maps market -> tx hash sent and not yet mined.
  * While a hash is pending, the market is skipped, so a slow block never causes a second send.
  */
-export async function tick(client, wallet, market, execute, pending = new Map(), { read = readState, receiptTimeoutMs = 60_000 } = {}) {
+export async function tick(client, wallet, market, execute, pending = new Map(), {
+  read = readState, receiptTimeoutMs = 60_000, prepare = async (r) => r, log = (l) => console.log(JSON.stringify(l)),
+} = {}) {
   const waiting = pending.get(market);
   if (waiting) {
     const rc = await client.getTransactionReceipt({ hash: waiting }).catch(() => null);
     if (!rc) {
       const line = { market, action: "PENDING", reason: "A sent tx is not mined yet. Skip.", tx: { hash: waiting } };
-      console.log(JSON.stringify(line));
+      log(line);
       return line;
     }
     pending.delete(market);
-    console.log(JSON.stringify({ market, action: "MINED", tx: { hash: waiting, status: rc.status } }));
+    log({ market, action: "MINED", tx: { hash: waiting, status: rc.status } });
   }
   const s = await read(client, market);
   const plan = keeperPlan(s);
@@ -88,7 +90,7 @@ export async function tick(client, wallet, market, execute, pending = new Map(),
       const { request, result } = await client.simulateContract({ account, address: s.adjudicator, abi: adjudicatorAbi, functionName, args: [market] });
       line.simulated = { ok: true, result: result === undefined ? null : Number(result) };
       if (execute) {
-        const hash = await wallet.writeContract(request);
+        const hash = await wallet.writeContract(await prepare(request));
         pending.set(market, hash);
         line.tx = { hash, status: "pending" };
         const receipt = await client.waitForTransactionReceipt({ hash, timeout: receiptTimeoutMs }).catch(() => null);
@@ -98,7 +100,7 @@ export async function tick(client, wallet, market, execute, pending = new Map(),
       line.simulated = { ok: false, error: e.shortMessage ?? e.message };
     }
   }
-  console.log(JSON.stringify(line));
+  log(line);
   return line;
 }
 

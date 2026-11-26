@@ -225,10 +225,12 @@ export function walletFromEnv(rpc, chain = bsc, env = process.env) {
 }
 
 /** Send a built trade (approval first if needed). Simulates the trade before sending. */
-export async function sendTrade(publicClient, wallet, built) {
+/** `prepare` (optional) adds fields such as gas and gasPrice to each tx before it is sent. */
+export async function sendTrade(publicClient, wallet, built, { prepare = async (r) => r } = {}) {
   const hashes = {};
   if (built.approval) {
-    hashes.approval = await wallet.sendTransaction({ to: built.approval.to, data: built.approval.data });
+    const tx = await prepare({ account: wallet.account, to: built.approval.to, data: built.approval.data });
+    hashes.approval = await wallet.sendTransaction(tx);
     await publicClient.waitForTransactionReceipt({ hash: hashes.approval });
   }
   const { market, outcome, deltaShares, maxIn } = built.args;
@@ -236,7 +238,7 @@ export async function sendTrade(publicClient, wallet, built) {
     account: wallet.account, address: built.trade.to, abi: ammAbi, functionName: "tradePositions",
     args: [market, outcome, BigInt(deltaShares), BigInt(maxIn)],
   });
-  hashes.trade = await wallet.writeContract(request);
+  hashes.trade = await wallet.writeContract(await prepare(request));
   const receipt = await publicClient.waitForTransactionReceipt({ hash: hashes.trade });
   return { ...hashes, status: receipt.status };
 }

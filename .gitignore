@@ -11,3 +11,7 @@ node_modules/
 agent/cache/
 web/config.json
 web/reports/
+# bot
+agent/bot-state.json
+agent/bot-state.json.tmp
+agent/bot.env
