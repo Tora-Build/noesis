@@ -32,7 +32,7 @@ Audience: holders of tokenized stocks and BNB who want downside protection, and 
 | Source | What we use | Where in the code |
 |---|---|---|
 | Atlas Oracle MultiFeed (BSC mainnet) | `fetch(bytes4)` for settlement and live price | `contracts/src/PriceFeedAdjudicator.sol`, `web/app.js` |
-| CoinMarketCap Pro API | `/v3/cryptocurrency/quotes/latest`, `/v1/k-line/candles` (30-day volatility), `/v3/fear-and-greed/latest`, `/v1/global-metrics/quotes/latest` | `agent/src/cmc.mjs` |
+| CoinMarketCap Pro API | `/v3/cryptocurrency/quotes/latest`, `/v1/k-line/candles` (BNB volatility), 1d to 90d price changes from quotes (volatility for tokenized stocks), `/v3/fear-and-greed/latest`, `/v1/global-metrics/quotes/latest` | `agent/src/cmc.mjs` |
 | Cournot Intelligence Oracle | `/intelligence/v1/resolve`, `/intelligence/v1/probability` (probability with evidence) | `agent/src/cournot.mjs` |
 | Chainlink (BSC) | BNB/USD and BTC/USD, only where Atlas has no feed yet | `contracts/script/DeployHedge.s.sol` |
 
