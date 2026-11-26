@@ -6,16 +6,17 @@ NOESIS is built on Sooth. The code and contracts below use the working name Soot
 
 Risk markets for agents on BNB Chain.
 
-CoinMarketCap finds the risk. Cournot gives the odds, with evidence. Sooth prices and trades the risk. Atlas Oracle settles it on-chain, with no person in the loop.
+CoinMarketCap finds the risk. Cournot gives the odds, with evidence. The Atlas Consensus Score says how much to trust the data. Sooth prices and trades the risk. Atlas Oracle settles it on-chain, with no person in the loop.
 
 ## What it does
 
 1. **Markets on prices.** Each market asks a price question, for example "IWMB below $264 at 2026-12-01 05:00 UTC" or "BNB below $560 at 2026-12-01 05:00 UTC". It trades on a Sooth node on BSC mainnet (LMSR AMM and order book).
 2. **Settlement from the feed.** `PriceFeedAdjudicator` reads the Atlas Oracle MultiFeed (or a Chainlink-style feed) and proposes the outcome itself. Anyone can call `settleFromFeed`. By default there is no guardian and no veto window (`VETO_SECONDS=0`): only the feed decides. Then anyone calls `settle`.
 3. **The risk agent.** For each market the agent reads:
-   - CoinMarketCap: spot, realized volatility from candles, Fear and Greed.
+   - CoinMarketCap: spot, Fear and Greed, global metrics, and volatility: realized from 30 daily DEX candles for BNB, or from 1h to 90d price changes for tokenized stocks (they have no DEX candles).
    - Cournot Intelligence Oracle: the probability of the same claim, with its evidence.
    - Sooth: the market's YES price.
+   - Atlas Pull API (Atlas markets): the signed Consensus Score. The agent checks the signature against the Atlas signer. HEALTHY: full size. DEGRADED: half size. WARNING, CRITICAL, SPLIT_MARKET, UNKNOWN or a bad signature: no trade. The key (`ATLAS_API_KEY`) stays on the server.
 
    It blends these into a fair probability and a risk score. If the gap to the Sooth price is larger than the threshold, it buys YES or NO with a capped Kelly size. Otherwise it holds. Each decision is written to a report with every input and the evidence.
 4. **The page.** `web/` shows each market with the feed price, the Sooth price, Cournot, the CMC model, the risk and the agent's decision. A wallet can trade, settle from the feed, finalize and claim.
@@ -160,4 +161,5 @@ at `https://tora-build.github.io/sooth-hedge/`.
 - **Touch markets are off by default.** A trader could buy and settle in one tx right after a cross. If you turn them on (`ALLOW_TOUCH=1`), a touch that nobody submits between two feed reads is missed.
 - **Demo collateral:** hUSD-DEMO ("Sooth Hedge Demo USD (no value)") is a demo token with no value. Anyone can take 1,000 a day from its faucet. Pass `STABLE=<token>` to deploy on a real stablecoin.
 - **Chainlink for BNB and BTC:** Atlas has no public push feed for BNB or BTC yet, so those markets use Chainlink. They move to Atlas when Atlas publishes those feeds.
-- **Cournot calls:** each IP gets 3 free Cournot probability calls. After that a call costs $0.01. The agent never pays by itself.
+- **Cournot calls:** each IP gets 3 free Cournot probability calls. After that a call costs $0.01. The agent never pays by itself. The bot only reuses cached answers (`BOT_COURNOT_IDS=0xMARKET:ID[:invert],…`), and `COURNOT_OFFLINE=1` stops any call on a cache miss.
+- **Consensus Score is off-chain.** The agent uses it to size trades. Settlement still reads only the on-chain Atlas feed.
