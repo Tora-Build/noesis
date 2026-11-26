@@ -15,7 +15,7 @@ Price the Unknown. Autonomous financial intelligence infrastructure, built on So
 
 ## Links
 
-- Repository: https://github.com/Tora-Build/sooth-hedge
+- Repository: https://github.com/Tora-Build/noesis
 - Live demo: https://noesis-7fg.pages.dev
 - Video (3 minutes or less): TODO
 
