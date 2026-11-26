@@ -1,3 +1,4 @@
+import { consensusGate } from "./atlas.mjs";
 // Pure pipeline: chain state + CMC snapshot + Cournot result -> report with decision.
 
 import { fairProbability, riskScore, KIND, KIND_NAME } from "./model.mjs";
@@ -33,7 +34,7 @@ export function marketTitle(asset, terms, deadline) {
  * @param {string} a.asset
  * @param {object} [a.opts]    decide() options
  */
-export function analyze({ chain, snapshot, cournot = null, asset, opts = {} }) {
+export function analyze({ chain, snapshot, cournot = null, atlas = null, asset, opts = {} }) {
   const t = chain.terms;
   const spot = chain.feed?.price ?? snapshot.spot;
   const spotSource = chain.feed?.price != null ? "onchain_feed" : "cmc";
@@ -45,7 +46,13 @@ export function analyze({ chain, snapshot, cournot = null, asset, opts = {} }) {
   const decision = decide({
     pSooth: chain.yesPrice, pCournot, pModel, risk: risk.score,
     feedAgeSec: chain.feed?.ageSec ?? null, tradingOpen: chain.tradingOpen,
+    consensus: consensusGate(atlas?.feed ?? null),
   }, opts);
+  if (atlas?.feed?.price && chain.feed?.price) {
+    const gap = Math.abs(atlas.feed.price - chain.feed.price) / chain.feed.price;
+    atlas.feed.onchainGapPct = gap * 100;
+    if (gap > 0.01) decision.alerts.push({ code: "ATLAS_API_ONCHAIN_GAP", level: "warn", message: `Atlas API and on-chain feed differ by ${(gap * 100).toFixed(2)}%.` });
+  }
   if (cournot?.needsPayment) {
     decision.alerts.push({ code: "COURNOT_PAYMENT_REQUIRED", level: "info", message: "Cournot free calls are used up. No payment was made. The decision uses the CMC model only." });
   } else if (cournot && cournot.state !== "complete" && cournot.state !== "skipped") {
@@ -85,6 +92,7 @@ export function analyze({ chain, snapshot, cournot = null, asset, opts = {} }) {
         fearGreed: snapshot.fearGreed, global: snapshot.global, candles: snapshot.candles, errors: snapshot.errors ?? [],
       },
       model: { pModel, risk },
+      atlas: atlas ? { state: atlas.state, ...(atlas.feed ?? {}), error: atlas.error ?? null } : null,
       cournot: cournot && {
         state: cournot.state, marketId: cournot.marketId ?? null, probability: pCournot, result: cournot.result ?? null,
         inverted: cournot.inverted ?? false, sourceProbability: cournot.sourceProbability ?? null,

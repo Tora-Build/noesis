@@ -115,6 +115,7 @@ a:hover { text-decoration-color: currentColor; }
 #connect .w-bal { padding-right: 10px; margin-right: 10px; border-right: 1px solid rgba(11, 13, 18, .25); font-weight: 600; }
 #connect .w-addr { font-weight: 500; }
 #connect { gap: 0; }
+.cons .or-kv { margin-top: 12px; }
 .net { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); padding-right: 4px; }
 .net .mono { font-size: 12px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); display: inline-block; }
@@ -433,6 +434,12 @@ h2 { font-weight: 500; letter-spacing: -.02em; }
 .set-when { font-size: 12px; color: var(--ink-3); }
 .status { flex: none; font: 600 10.5px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; padding: 6px 8px; border-radius: 4px; background: var(--sunk); color: var(--ink-2); border: 1px solid var(--line-2); }
 .status.done { background: var(--pos-soft); color: var(--pos); border-color: transparent; }
+.status.bad { background: var(--neg-soft, rgba(255,107,107,.15)); color: var(--neg); border-color: transparent; }
+.cons { margin: 16px 0 0; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--sunk); }
+.cons-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.cons-h { margin: 0; font-weight: 600; font-size: 14px; }
+.cons-score { margin: 8px 0 4px; font-size: 32px; font-weight: 600; line-height: 1.1; }
+.cons-score .muted { font-size: 16px; font-weight: 400; }
 .status.wait { background: var(--accent-soft); color: var(--ink); border-color: transparent; }
 .set-line { margin: 8px 0 0; font-size: 14px; color: var(--ink-2); }
 .set-line .mono { color: var(--ink); }

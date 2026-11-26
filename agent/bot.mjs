@@ -14,6 +14,7 @@ import { privateKeyToAccount } from "viem/accounts";
 
 import { loadEnvFiles } from "./src/env.mjs";
 import { ASSETS, fetchSnapshot } from "./src/cmc.mjs";
+import { fetchConsensus } from "./src/atlas.mjs";
 import { walletFromEnv, readMarket, numberToFeedId, erc20Abi, wadToFloat, adjudicatorAbi } from "./src/sooth.mjs";
 import { fairProbability, KIND } from "./src/model.mjs";
 import { nextWeekdayDeadline, planLadder, marketText, marketKey, parseHHMM } from "./src/ladder.mjs";
@@ -153,6 +154,13 @@ export async function startBot(env = process.env) {
     await sync();
     const now = await chainNow();
     let traded = 0;
+    // One signed Atlas call per run for every open Atlas feed: price and Consensus Score.
+    const atlasIds = [...new Set(Object.entries(state.markets)
+      .filter(([mk, m]) => !state.done[mk] && m.deadline > now + 60 && m.source === 0)
+      .map(([, m]) => String(parseInt(m.feedId, 16))))];
+    const atlasRes = atlasIds.length ? await fetchConsensus(atlasIds) : { state: "skipped", feeds: {} };
+    if (atlasIds.length) log({ job: "agent", action: "ATLAS_CONSENSUS", state: atlasRes.state, signatureValid: atlasRes.signatureValid ?? null, error: atlasRes.error ?? undefined,
+      feeds: Object.values(atlasRes.feeds).map((f) => ({ id: f.feedId, status: f.consensusStatus, score: f.consensusScore, price: f.price })) });
     for (const [market, m] of Object.entries(state.markets)) {
       if (state.done[market] || m.deadline <= now + 60 || !m.asset || !ASSETS[m.asset]) continue;
       try {
@@ -166,7 +174,7 @@ export async function startBot(env = process.env) {
           client, market, chain, asset: m.asset, snapshot: snap ?? fallbackSnapshot(m.asset),
           cournotMode: cfg.cournotResolve ? "resolve" : "off", // never the paid probability endpoint
           decideOpts: { bankroll: cfg.bankroll }, slippage: cfg.slippage, account: account?.address ?? null,
-          wallet, execute: !cfg.dryRun && !!wallet, maxSpendUsd: left, prepare,
+          wallet, execute: !cfg.dryRun && !!wallet, maxSpendUsd: left, prepare, atlas: atlasRes,
         });
         report.bot = { dailyCap: cfg.dailySpend, spentBefore: cfg.dailySpend - left };
         const dcs = report.decision;

@@ -38,7 +38,7 @@ export function kelly(q, price) {
  * @param {boolean} [i.tradingOpen]
  * @param {object} [opts]
  */
-export function decide({ pSooth, pCournot = null, pModel = null, risk = 0, feedAgeSec = null, tradingOpen = true }, opts = {}) {
+export function decide({ pSooth, pCournot = null, pModel = null, risk = 0, feedAgeSec = null, tradingOpen = true, consensus = null }, opts = {}) {
   const o = { ...DEFAULTS, ...opts };
   const alerts = [];
   const pStar = blend(pCournot, pModel, o.cournotWeight);
@@ -51,12 +51,17 @@ export function decide({ pSooth, pCournot = null, pModel = null, risk = 0, feedA
     alerts.push({ code: "FEED_STALE", level: "warn", message: `Price feed is ${Math.round(feedAgeSec)} s old (limit ${o.staleSec} s).` });
   }
 
-  const base = { pSooth, pCournot, pModel, pStar, risk, alerts, params: o };
+  // Atlas Consensus Score (see src/atlas.mjs consensusGate): HEALTHY full size, DEGRADED half, worse no trade.
+  if (consensus?.applies && consensus.sizeMultiplier < 1) {
+    alerts.push({ code: "ATLAS_CONSENSUS", level: consensus.hold ? "warn" : "info", message: consensus.reason });
+  }
+  const base = { pSooth, pCournot, pModel, pStar, risk, alerts, params: o, consensus: consensus?.applies ? consensus : null };
   if (pSooth == null || pStar == null) return { ...base, action: "HOLD", edge: null, fraction: 0, sizeUsd: 0, reason: "Missing price or probability." };
   const edge = pStar - pSooth;
   base.edge = edge;
   if (!tradingOpen) return { ...base, action: "HOLD", fraction: 0, sizeUsd: 0, reason: "Trading is closed." };
   if (alerts.some((a) => a.code === "FEED_STALE")) return { ...base, action: "HOLD", fraction: 0, sizeUsd: 0, reason: "Feed is stale." };
+  if (consensus?.hold) return { ...base, action: "HOLD", fraction: 0, sizeUsd: 0, reason: consensus.reason };
   if (risk >= o.riskCap) return { ...base, action: "HOLD", fraction: 0, sizeUsd: 0, reason: `Risk ${risk} is at or above the cap ${o.riskCap}.` };
   if (Math.abs(edge) <= o.edgeThreshold) return { ...base, action: "HOLD", fraction: 0, sizeUsd: 0, reason: `Edge ${pct(edge)} is inside the threshold ${pct(o.edgeThreshold)}.` };
 
@@ -64,7 +69,8 @@ export function decide({ pSooth, pCournot = null, pModel = null, risk = 0, feedA
   const price = buyYes ? pSooth : 1 - pSooth;
   const q = buyYes ? pStar : 1 - pStar;
   const f = kelly(q, price);
-  const fraction = clamp(o.kellyMultiplier * f * (1 - risk / 100), 0, o.maxFraction);
+  const mult = consensus?.applies ? consensus.sizeMultiplier : 1;
+  const fraction = clamp(o.kellyMultiplier * f * (1 - risk / 100), 0, o.maxFraction) * mult;
   const sizeUsd = round2(o.bankroll * fraction);
   return {
     ...base,
@@ -74,7 +80,7 @@ export function decide({ pSooth, pCournot = null, pModel = null, risk = 0, feedA
     fraction,
     sizeUsd,
     entryPrice: price,
-    reason: `Fair ${pct(pStar)} vs Sooth ${pct(pSooth)}: edge ${pct(edge)}, risk ${risk}.`,
+    reason: `Fair ${pct(pStar)} vs Sooth ${pct(pSooth)}: edge ${pct(edge)}, risk ${risk}.${consensus?.applies ? ` ${consensus.reason}` : ""}`,
   };
 }
 
