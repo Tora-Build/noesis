@@ -88,6 +88,13 @@ export async function buildWeb(o) {
     for (const l of logs) {
       if (l.args.adjudicator.toLowerCase() !== d.adjudicator.toLowerCase()) continue;
       const t = await client.readContract({ address: d.adjudicator, abi: termsAbi, functionName: 'terms', args: [l.args.market] });
+      // Skip a market whose question names a strike other than its on-chain strike
+      // (a creation typo). The terms decide the payout, so the text must match them.
+      const named = /\$([\d,]+(?:\.\d+)?)/.exec(l.args.question)?.[1];
+      if (named && Math.abs(Number(named.replace(/,/g, '')) - Number(t.strikeWad) / 1e18) > 1e-6) {
+        console.warn(`  skipped market ${l.args.market}: question says $${named}, terms say $${Number(t.strikeWad) / 1e18}`);
+        continue;
+      }
       markets.push({
         market: l.args.market, question: l.args.question, deadline: Number(l.args.deadline),
         asset: assetOf(t) ?? null, source: t.source, feed: t.feed, feedId: t.feedId, kind: t.kind,
