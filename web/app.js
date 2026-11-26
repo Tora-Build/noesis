@@ -864,15 +864,16 @@ const hms = (iso) => { const t = Date.parse(iso ?? ''); return Number.isFinite(t
 const srcBadge = (source) => `<span class="src-b src-${source === 0 ? 'atlas' : 'cl'}">${esc(SRC_LONG[source] ?? 'Feed')}</span>`;
 const metric = (k, v, extra = '', meter = null) => `<div class="metric"><dt>${esc(k)}</dt><dd>${esc(v)}${extra ? `<small>${esc(extra)}</small>` : ''}</dd>${num(meter) != null ? `<div class="meter" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, meter))}%"></i></div>` : ''}</div>`;
 
-// Volatility: what the agent used and how. Never claims candles: the CMC free plan has none.
+// Volatility: what the agent used and how. BNB uses CMC DEX candles; tokenized stocks have none.
 function volText(c) {
   const sd = c.sigmaDetail, sig = num(c.sigma);
   if (sd && num(sd.cmc) != null && num(sd.prior) != null) {
     return {
       parts: `CMC estimate ${pct(sd.cmc, 0)}, prior ${pct(sd.prior, 0)}, blended ${pct(sig, 0)}. Blend = √((CMC² + prior²) / 2).`,
-      how: 'From CMC price changes (1h to 90d windows); the free plan has no candles.',
+      how: 'From CMC price changes (1h to 90d windows). Tokenized stocks have no CMC DEX candles.',
     };
   }
+  if (c.sigmaSource === 'realized_1d_candles') return { parts: `Realized volatility ${pct(sig, 0)}.`, how: `From ${c.candles?.count ?? 'the'} daily CMC DEX candles (/v1/k-line/candles).` };
   if (c.sigmaSource === 'default') return { parts: `Prior only: ${pct(sig, 0)}.`, how: 'CMC gave too few price changes, so the agent used the prior.' };
   if (c.sigmaSource === 'cmc_price_changes') return { parts: `Blended value ${pct(sig, 0)}.`, how: 'From CMC price changes blended with a prior. This report does not list the two parts.' };
   return { parts: sig != null ? '' : 'No value in this report.', how: 'This report is from an older agent version. It does not list how the value was made.' };
