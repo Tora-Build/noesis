@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sooth Hedge</title>
+  <meta name="description" content="Set a price floor for tokenized stocks and BNB. Paid from the oracle price on BNB Chain.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23101214'/%3E%3Cpath d='M7 11h18' stroke='%23fff' stroke-width='2.5'/%3E%3Cpath d='M7 21h18' stroke='%23F0B90B' stroke-width='2.5' stroke-dasharray='3 2.5'/%3E%3C/svg%3E">
+</head>
+<body>
+  <a class="skip" href="#protect">Skip to the price floor</a>
+
+  <header class="bar">
+    <div class="bar-in">
+      <a class="brand" href="#" aria-label="Sooth Hedge, home">
+        <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true"><rect width="32" height="32" rx="6" fill="currentColor"/><path d="M7 11h18" stroke="var(--bg)" stroke-width="2.5"/><path d="M7 21h18" stroke="#F0B90B" stroke-width="2.5" stroke-dasharray="3 2.5"/></svg>
+        <span>Sooth Hedge</span>
+      </a>
+      <nav class="nav" aria-label="Sections">
+        <a href="#protect">Protect</a>
+        <a href="#strikes">Levels</a>
+        <a href="#agent">Risk agent</a>
+        <a href="#settled">Settled</a>
+      </nav>
+      <div class="bar-end">
+        <span class="net" id="net" title="Network and latest block"><i class="dot" aria-hidden="true"></i><span>BNB Chain</span><span class="mono muted" id="block"></span></span>
+        <button class="btn btn-quiet" id="faucet" hidden>Get hUSD-DEMO</button>
+        <button class="btn btn-ink" id="connect">Connect wallet</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero" id="protect" aria-labelledby="hero-h">
+      <div class="hero-head">
+        <h1 id="hero-h">Set a floor under your price.</h1>
+        <p class="lede">Drag the yellow line. If the price ends at or below it, you get paid.</p>
+      </div>
+
+      <div class="controls" role="group" aria-label="Market">
+        <div class="seg-wrap"><span class="seg-k" id="assetK">Asset</span><div class="seg" id="assetSeg" role="radiogroup" aria-labelledby="assetK"></div></div>
+        <div class="seg-wrap"><span class="seg-k" id="endK">Ends</span><div class="seg" id="endSeg" role="radiogroup" aria-labelledby="endK"></div></div>
+        <div class="seg-wrap"><span class="seg-k" id="modeK">Cover</span><div class="seg" id="modeSeg" role="radiogroup" aria-labelledby="modeK">
+          <label><input type="radio" name="mode" value="one" checked><span>One level</span></label>
+          <label><input type="radio" name="mode" value="stair"><span>Staircase</span></label>
+        </div></div>
+      </div>
+
+      <div class="stage">
+        <div class="chart" id="chart">
+          <div class="chart-top">
+            <p class="now"><span class="now-k" id="nowK">-</span> <span class="now-p mono" id="nowP"><span class="skel" aria-hidden="true"></span></span> <span class="now-age muted" id="nowAge"></span></p>
+            <p class="chart-cap muted" id="chartCap"></p>
+          </div>
+          <div class="plot" id="plot">
+            <svg id="svg" aria-labelledby="svgTitle" role="group"><title id="svgTitle">Price chart with a floor line</title></svg>
+            <div class="tag" id="tag" aria-hidden="true"></div>
+            <p class="plot-msg" id="plotMsg" hidden></p>
+          </div>
+        </div>
+
+        <div class="readout" id="readout">
+          <div class="ro-nums">
+          <div class="ro-cell">
+            <span class="ro-k" id="roPayK">Pays</span>
+            <span class="ro-big mono" id="roPay">-</span>
+            <span class="ro-sub" id="roPaySub">&nbsp;</span>
+          </div>
+          <div class="ro-cell" aria-live="polite" aria-atomic="true">
+            <span class="ro-k">Costs now</span>
+            <span class="ro-big mono" id="roCost">-</span>
+            <span class="ro-sub" id="roChance">&nbsp;</span>
+          </div>
+          </div>
+          <ol class="legs" id="legs" hidden></ol>
+        <form id="form" class="order" novalidate>
+          <div class="amount">
+            <label class="amt-k" for="amt">Get paid</label>
+            <span class="amt-field"><span aria-hidden="true">$</span><input id="amt" class="field num" type="number" inputmode="decimal" min="0" step="any" value="500" aria-describedby="amtNote"></span>
+            <div class="chips" role="group" aria-label="Preset amounts">
+              <button type="button" class="chip" data-amt="100">$100</button>
+              <button type="button" class="chip" data-amt="500">$500</button>
+              <button type="button" class="chip" data-amt="1000">$1,000</button>
+              <button type="button" class="chip chip-cover" id="coverBtn" hidden></button>
+            </div>
+          </div>
+          <p class="amt-note" id="amtNote"></p>
+          <p class="form-msg" id="formMsg" role="status"></p>
+          <div class="cta">
+            <p class="cta-note" id="ctaNote">Paid in hUSD-DEMO. The oracle price decides.</p>
+            <button type="submit" class="btn btn-cta" id="protectBtn" disabled>Protect</button>
+          </div>
+          <p class="faucet-inline small muted">Need test money? <button class="btn-link" type="button" data-faucet>Get 1,000 hUSD-DEMO</button></p>
+        </form>
+        </div>
+      </div>
+
+
+      <div class="mine" id="mine" hidden>
+        <h2 class="sub-h">Your cover</h2>
+        <ul id="mineList" class="mine-list"></ul>
+      </div>
+
+      <details class="more" id="ruleBox">
+        <summary>Details: how this settles</summary>
+        <div class="more-in" id="ruleBody"></div>
+      </details>
+    </section>
+
+    <!-- Strike ladder -->
+    <section class="panel ladder" id="strikes" aria-labelledby="ladder-h">
+      <div class="panel-head">
+        <h2 id="ladder-h" class="panel-h">Levels for <span id="lAsset">-</span></h2>
+        <p class="muted small" id="lWhen"></p>
+      </div>
+      <div class="table-scroll">
+        <table class="grid-t" id="ladder">
+          <thead>
+            <tr>
+              <th scope="col">Level</th>
+              <th scope="col" class="r c-dist">From now</th>
+              <th scope="col" class="r">Price per $1</th>
+              <th scope="col" class="r">Fair</th>
+              <th scope="col" class="r c-cour">Cournot</th>
+              <th scope="col">Agent</th>
+              <th scope="col" class="r c-you">You have</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <details class="more" id="trader">
+        <summary>Details: trader view</summary>
+        <div class="trader-in">
+          <p class="small muted">Price is the live AMM price per $1 of payout. Fair is the agent's price. Cournot is an AI oracle's chance. Trade YES or NO shares on the selected level here.</p>
+          <div class="trader-row"><span class="mono small" id="tMarket">-</span></div>
+          <div class="trader-row">
+            <div class="seg" role="radiogroup" aria-label="Side">
+              <label><input type="radio" name="side" value="1" checked><span>YES</span></label>
+              <label><input type="radio" name="side" value="0"><span>NO</span></label>
+            </div>
+            <label class="sr" for="tShares">Shares</label>
+            <input id="tShares" class="field num" type="number" min="0" step="any" value="10">
+            <span class="small muted">shares</span>
+            <span class="mono small" id="tQuote"></span>
+            <button class="btn btn-ink btn-sm" id="tBuy" type="button">Buy</button>
+          </div>
+          <dl class="kv small" id="tState"></dl>
+          <p class="form-msg" id="tMsg" role="status"></p>
+        </div>
+      </details>
+    </section>
+
+    <div class="pair">
+      <section class="panel agent" id="agent" aria-labelledby="agent-h">
+        <div class="panel-head">
+          <h2 id="agent-h" class="panel-h">Risk agent</h2>
+          <p class="muted small" id="agWhen"></p>
+        </div>
+        <div id="agBody"><p class="empty">No agent report for this level yet.</p></div>
+      </section>
+
+      <section class="panel settled" id="settled" aria-labelledby="settled-h">
+        <div class="panel-head">
+          <h2 id="settled-h" class="panel-h">Settled</h2>
+          <p class="muted small">By the feed only.</p>
+        </div>
+        <ul id="setList" class="set-list"><li class="empty">Loading.</li></ul>
+      </section>
+    </div>
+
+    <details class="more how" id="how">
+      <summary>Details: who does what</summary>
+      <ol class="steps">
+        <li><span class="step-role">Creator</span><p>Opens a market with a fixed feed, level and time.</p><code>terms(market)</code></li>
+        <li><span class="step-role">Pricer</span><p>Reads CoinMarketCap and Cournot and writes a fair price.</p><code>agent/run.mjs</code></li>
+        <li><span class="step-role">Trader</span><p>Buys only when the market is far from the fair price.</p><code>tradePositions(...)</code></li>
+        <li><span class="step-role">Settler</span><p>Reads the oracle after the time and proposes the result.<span id="vetoNote" hidden> A guardian can veto for <span id="vetoMin">a short time</span>.</span></p><code>settleFromFeed → settle → settlePosition</code></li>
+      </ol>
+    </details>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-in">
+      <p><strong>hUSD-DEMO is demo money with no value.</strong> Anyone can take 1,000 hUSD-DEMO a day from its faucet.</p>
+      <dl class="contracts" id="contracts"></dl>
+    </div>
+  </footer>
+
+  <dialog id="confirm" aria-labelledby="cf-h">
+    <form method="dialog" class="cf">
+      <h2 id="cf-h">Confirm your floor</h2>
+      <p class="cf-what" id="cfWhat"></p>
+      <table class="cf-legs" id="cfLegs"></table>
+      <dl class="kv cf-kv" id="cfRows"></dl>
+      <ol class="cf-steps" id="cfSteps"></ol>
+      <p class="form-msg" id="cfMsg" role="status"></p>
+      <div class="cf-actions">
+        <button class="btn btn-quiet" value="cancel" id="cfCancel">Cancel</button>
+        <button class="btn btn-cta" type="button" id="cfGo">Confirm in wallet</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

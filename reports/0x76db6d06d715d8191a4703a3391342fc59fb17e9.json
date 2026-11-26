@@ -1,0 +1,195 @@
+{
+  "title": "IWMB price at or below $268 at 2026-11-27 08:10 UTC",
+  "asset": "IWMB",
+  "market": "0x76DB6d06D715d8191A4703a3391342fC59Fb17e9",
+  "chainId": 56,
+  "generatedAt": "2026-11-26T13:54:33.000Z",
+  "proof": {
+    "chainId": 56,
+    "block": 135858152,
+    "blockHash": "0x9b8ec8eea8c4b3e95800dc2cd3831f87447d1cd57e4794b7a0a12861292363b1",
+    "blockTimestamp": 1795701273,
+    "amm": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+    "ammState": {
+      "qYes": "0",
+      "qNo": "80042707673536425823",
+      "priceWad": "480000000000000000"
+    },
+    "adjudicator": "0xa17feCd30c8E1c2C9BcfE19469f20EFF4e7e2be9",
+    "feed": {
+      "priceWad": "268168750986907599600",
+      "ts": 1795701230
+    }
+  },
+  "inputs": {
+    "sooth": {
+      "yesPrice": 0.48,
+      "qYes": "0",
+      "qNo": "80042707673536425823",
+      "priceWad": "480000000000000000",
+      "tradingOpen": true,
+      "amm": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+      "phase": "ACTIVE"
+    },
+    "terms": {
+      "source": 0,
+      "feed": "0xEAcE519ebB14fB8404fA6DdD23C3b34abaDE44aa",
+      "feedId": "0x0000048e",
+      "kind": 1,
+      "strike": 268,
+      "strikeWad": "268000000000000000000",
+      "maxDelay": 900,
+      "kindName": "CLOSE_BELOW"
+    },
+    "deadline": 1795767000,
+    "deadlineIso": "2026-11-27T08:10:00.000Z",
+    "feed": {
+      "price": 268.1687509869076,
+      "priceWad": "268168750986907599600",
+      "ts": 1795701230,
+      "ageSec": 43
+    },
+    "spot": 268.1687509869076,
+    "spotSource": "onchain_feed",
+    "touched": false,
+    "cmc": {
+      "mode": "keyed",
+      "calls": [
+        {
+          "path": "/v3/cryptocurrency/quotes/latest",
+          "at": "2026-11-26T13:54:33.751Z",
+          "status": 200
+        },
+        {
+          "path": "/v1/k-line/candles",
+          "at": "2026-11-26T13:54:34.284Z",
+          "status": 200
+        },
+        {
+          "path": "/v3/fear-and-greed/latest",
+          "at": "2026-11-26T13:54:34.777Z",
+          "status": 200
+        },
+        {
+          "path": "/v1/global-metrics/quotes/latest",
+          "at": "2026-11-26T13:54:34.990Z",
+          "status": 200
+        }
+      ],
+      "spot": 267.88903920339123,
+      "sigma": 0.19968262882019713,
+      "sigmaSource": "cmc_price_changes",
+      "pct24h": 1.438304956239,
+      "pct7d": -1.478120482006,
+      "pct30d": -0.322000038258,
+      "fearGreed": {
+        "value": 10,
+        "classification": "Extreme fear",
+        "updated": "2026-11-26T13:53:10.024Z"
+      },
+      "global": {
+        "btcDominance": 58.774910201043,
+        "ethDominance": 9.993929366788,
+        "totalMarketCap": 2082845089292.2917,
+        "totalVolume24h": 77840154209.86,
+        "marketCapChange24hPct": 4.10026923,
+        "updated": "2026-11-26T13:52:59.999Z"
+      },
+      "candles": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "errors": []
+    },
+    "model": {
+      "pModel": 0.4742890735720757,
+      "risk": {
+        "score": 63,
+        "components": {
+          "vol": 0.19968262882019713,
+          "sentiment": 0.8,
+          "proximity": 0.9976188633243306
+        }
+      }
+    },
+    "cournot": {
+      "state": "skipped",
+      "marketId": null,
+      "probability": null,
+      "result": null,
+      "cached": false,
+      "needsPayment": false,
+      "fetchedAt": null,
+      "billing": null,
+      "freeQuota": null,
+      "resolveCandidates": [
+        {
+          "id": 21515022,
+          "title": "BNB price on Nov 27, 2026? (Yes: $685 or above)",
+          "endTime": "2026-11-27T22:00:00Z",
+          "marketPrice": 0.04,
+          "confidence": 0.485
+        },
+        {
+          "id": 27281279,
+          "title": "BNB price on Nov 26, 2026? (Yes: $590 or above)",
+          "endTime": "2026-11-26T22:00:00Z",
+          "marketPrice": 0.03,
+          "confidence": 0.48
+        },
+        {
+          "id": 28881147,
+          "title": "BNB price on Nov 26, 2026? (Yes: $505 or above)",
+          "endTime": "2026-11-26T22:00:00Z",
+          "marketPrice": 0.98,
+          "confidence": 0.468
+        },
+        {
+          "id": 22715665,
+          "title": "BNB price on Nov 26, 2026? (Yes: $550 or above)",
+          "endTime": "2026-11-26T22:00:00Z",
+          "marketPrice": 0.69,
+          "confidence": 0.468
+        },
+        {
+          "id": 22511220,
+          "title": "BNB price on Nov 27, 2026? (Yes: $465 or above)",
+          "endTime": "2026-11-27T22:00:00Z",
+          "marketPrice": 0.99,
+          "confidence": 0.465
+        }
+      ]
+    }
+  },
+  "evidence": {
+    "cournotBasis": null,
+    "lines": []
+  },
+  "decision": {
+    "pSooth": 0.48,
+    "pCournot": null,
+    "pModel": 0.4742890735720757,
+    "pStar": 0.4742890735720757,
+    "risk": 63,
+    "alerts": [],
+    "params": {
+      "edgeThreshold": 0.05,
+      "riskCap": 75,
+      "cournotWeight": 0.6,
+      "kellyMultiplier": 0.5,
+      "maxFraction": 0.1,
+      "bankroll": 100,
+      "gapAlert": 0.15,
+      "highRisk": 70,
+      "staleSec": 900
+    },
+    "edge": -0.005710926427924257,
+    "action": "HOLD",
+    "fraction": 0,
+    "sizeUsd": 0,
+    "reason": "Edge -0.6% is inside the threshold 5.0%."
+  },
+  "mode": "dry-run",
+  "cournotMessage": "IWMB price at or below $268 at 2026-11-27 08:10 UTC"
+}

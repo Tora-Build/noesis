@@ -1,0 +1,200 @@
+{
+  "title": "IWMB price at or below $262 at 2026-12-01 21:00 UTC",
+  "asset": "IWMB",
+  "market": "0x760CFE1724ECc31f8b5FaA9832b0772E1664F52b",
+  "chainId": 56,
+  "generatedAt": "2026-11-26T13:55:02.000Z",
+  "proof": {
+    "chainId": 56,
+    "block": 135858216,
+    "blockHash": "0x75dde905c6387aeb89ee8876d3daee4e1880196187283a75c59d9fbd79b1b025",
+    "blockTimestamp": 1795701302,
+    "amm": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+    "ammState": {
+      "qYes": "0",
+      "qNo": "1239999918024207860835",
+      "priceWad": "224436000000000000"
+    },
+    "adjudicator": "0xa17feCd30c8E1c2C9BcfE19469f20EFF4e7e2be9",
+    "feed": {
+      "priceWad": "268164052682619693900",
+      "ts": 1795701290
+    }
+  },
+  "inputs": {
+    "sooth": {
+      "yesPrice": 0.224436,
+      "qYes": "0",
+      "qNo": "1239999918024207860835",
+      "priceWad": "224436000000000000",
+      "tradingOpen": true,
+      "amm": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+      "phase": "ACTIVE"
+    },
+    "terms": {
+      "source": 0,
+      "feed": "0xEAcE519ebB14fB8404fA6DdD23C3b34abaDE44aa",
+      "feedId": "0x0000048e",
+      "kind": 1,
+      "strike": 262,
+      "strikeWad": "262000000000000000000",
+      "maxDelay": 300,
+      "kindName": "CLOSE_BELOW"
+    },
+    "deadline": 1796158800,
+    "deadlineIso": "2026-12-01T21:00:00.000Z",
+    "feed": {
+      "price": 268.1640526826197,
+      "priceWad": "268164052682619693900",
+      "ts": 1795701290,
+      "ageSec": 12
+    },
+    "spot": 268.1640526826197,
+    "spotSource": "onchain_feed",
+    "touched": false,
+    "cmc": {
+      "mode": "keyed",
+      "calls": [
+        {
+          "path": "/v3/cryptocurrency/quotes/latest",
+          "at": "2026-11-26T13:55:02.845Z",
+          "status": 200
+        },
+        {
+          "path": "/v1/k-line/candles",
+          "at": "2026-11-26T13:55:03.519Z",
+          "status": 200
+        },
+        {
+          "path": "/v3/fear-and-greed/latest",
+          "at": "2026-11-26T13:55:03.941Z",
+          "status": 200
+        },
+        {
+          "path": "/v1/global-metrics/quotes/latest",
+          "at": "2026-11-26T13:55:04.204Z",
+          "status": 200
+        }
+      ],
+      "spot": 267.883708928524,
+      "sigma": 0.19963918236036768,
+      "sigmaSource": "cmc_price_changes",
+      "pct24h": 1.436286605473,
+      "pct7d": -1.480080803711,
+      "pct30d": -0.323983363666,
+      "fearGreed": {
+        "value": 10,
+        "classification": "Extreme fear",
+        "updated": "2026-11-26T13:53:10.024Z"
+      },
+      "global": {
+        "btcDominance": 58.766326377014,
+        "ethDominance": 9.992614113311,
+        "totalMarketCap": 2082138930551.0645,
+        "totalVolume24h": 77834111731.94,
+        "marketCapChange24hPct": 4.06697499,
+        "updated": "2026-11-26T13:53:59.999Z"
+      },
+      "candles": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "errors": []
+    },
+    "model": {
+      "pModel": 0.16977093931236942,
+      "risk": {
+        "score": 50,
+        "components": {
+          "vol": 0.19963918236036768,
+          "sentiment": 0.8,
+          "proximity": 0.6264820810277469
+        }
+      }
+    },
+    "cournot": {
+      "state": "skipped",
+      "marketId": null,
+      "probability": null,
+      "result": null,
+      "cached": false,
+      "needsPayment": false,
+      "fetchedAt": null,
+      "billing": null,
+      "freeQuota": null,
+      "resolveCandidates": []
+    }
+  },
+  "evidence": {
+    "cournotBasis": null,
+    "lines": []
+  },
+  "decision": {
+    "pSooth": 0.224436,
+    "pCournot": null,
+    "pModel": 0.16977093931236942,
+    "pStar": 0.16977093931236942,
+    "risk": 50,
+    "alerts": [],
+    "params": {
+      "edgeThreshold": 0.05,
+      "riskCap": 75,
+      "cournotWeight": 0.6,
+      "kellyMultiplier": 0.5,
+      "maxFraction": 0.1,
+      "bankroll": 100,
+      "gapAlert": 0.15,
+      "highRisk": 70,
+      "staleSec": 900
+    },
+    "edge": -0.05466506068763058,
+    "action": "BUY_NO",
+    "outcome": 0,
+    "kelly": 0.24356636496654083,
+    "fraction": 0.06089159124163521,
+    "sizeUsd": 6.09,
+    "entryPrice": 0.775564,
+    "reason": "Fair 17.0% vs Sooth 22.4%: edge -5.5%, risk 50.",
+    "sizing": {
+      "shares": 7.767818857955932,
+      "netAmount": 6.089981455021015,
+      "newPrice": 0.22308679343789764
+    }
+  },
+  "mode": "execute",
+  "cournotMessage": "IWMB price at or below $262 at 2026-12-01 21:00 UTC",
+  "tx": {
+    "from": "0x7BeA49490cc8Bef493A732ed6b1380B10E420243",
+    "quote": {
+      "cost": 6.029684608931698,
+      "fee": 0.06029684608931698,
+      "netAmount": 6.089981455021015,
+      "newPrice": 0.22308679343789764,
+      "maxIn": 6.211781084121435,
+      "needNative": "6211781084121435306"
+    },
+    "args": {
+      "market": "0x760CFE1724ECc31f8b5FaA9832b0772E1664F52b",
+      "outcome": 0,
+      "deltaShares": "7767818857955932617",
+      "maxIn": "6211781084121435306"
+    },
+    "approval": {
+      "to": "0x43614DeE734791F241328a8d70fC4c975ccC3778",
+      "data": "0x095ea7b3000000000000000000000000dcb89db01415885ff8ec1f74e50386c8673b05570000000000000000000000000000000000000000000000005634adfc0d8c8caa",
+      "value": "0",
+      "amount": "6211781084121435306"
+    },
+    "trade": {
+      "to": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+      "data": "0x5910cce4000000000000000000000000760cfe1724ecc31f8b5faa9832b0772e1664f52b00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006bccd6187c0b39c90000000000000000000000000000000000000000000000005634adfc0d8c8caa",
+      "value": "0"
+    },
+    "sent": {
+      "approval": "0xe0abfb60195a5d634220a16d75a40c04e36fd63132f5b8033d2b04dbcb521845",
+      "trade": "0x43404133605c50e799b9ba1683c0c605a5114dbc1cc0d88ee2e8de8952fd3197",
+      "status": "success"
+    }
+  }
+}

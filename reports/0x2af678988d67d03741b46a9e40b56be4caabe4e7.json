@@ -1,0 +1,212 @@
+{
+  "title": "BNB price at or below $450 at 2026-11-27 22:00 UTC",
+  "asset": "BNB",
+  "market": "0x2aF678988d67d03741B46a9E40B56Be4caAbE4e7",
+  "chainId": 56,
+  "generatedAt": "2026-11-26T14:36:31.000Z",
+  "proof": {
+    "chainId": 56,
+    "block": 135863745,
+    "blockHash": "0xaa224e99493652dce7eed19e5b038e0da6a0ee001f4934ecc6e38f3086ec18e1",
+    "blockTimestamp": 1795703791,
+    "amm": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+    "ammState": {
+      "qYes": "0",
+      "qNo": "3891820298110626610210",
+      "priceWad": "20000000000000000"
+    },
+    "adjudicator": "0xa17feCd30c8E1c2C9BcfE19469f20EFF4e7e2be9",
+    "feed": {
+      "priceWad": "552275260440000000000",
+      "ts": 1795703778
+    }
+  },
+  "inputs": {
+    "sooth": {
+      "yesPrice": 0.02,
+      "qYes": "0",
+      "qNo": "3891820298110626610210",
+      "priceWad": "20000000000000000",
+      "tradingOpen": true,
+      "amm": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+      "phase": "ACTIVE"
+    },
+    "terms": {
+      "source": 1,
+      "feed": "0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE",
+      "feedId": "0x00000000",
+      "kind": 1,
+      "strike": 450,
+      "strikeWad": "450000000000000000000",
+      "maxDelay": 300,
+      "kindName": "CLOSE_BELOW"
+    },
+    "deadline": 1795816800,
+    "deadlineIso": "2026-11-27T22:00:00.000Z",
+    "feed": {
+      "price": 552.27526044,
+      "priceWad": "552275260440000000000",
+      "ts": 1795703778,
+      "ageSec": 13
+    },
+    "spot": 552.27526044,
+    "spotSource": "onchain_feed",
+    "touched": false,
+    "cmc": {
+      "mode": "keyed",
+      "calls": [
+        {
+          "path": "/v3/cryptocurrency/quotes/latest",
+          "at": "2026-11-26T14:36:31.918Z",
+          "status": 200
+        },
+        {
+          "path": "/v1/k-line/candles",
+          "at": "2026-11-26T14:36:32.553Z",
+          "status": 200
+        },
+        {
+          "path": "/v3/fear-and-greed/latest",
+          "at": "2026-11-26T14:36:32.995Z",
+          "status": 200
+        },
+        {
+          "path": "/v1/global-metrics/quotes/latest",
+          "at": "2026-11-26T14:36:33.287Z",
+          "status": 200
+        }
+      ],
+      "spot": 552.5500962387107,
+      "sigma": 0.5684220447223045,
+      "sigmaSource": "realized_1d_candles",
+      "pct24h": 3.899219846899,
+      "pct7d": -6.688138197565,
+      "pct30d": -25.568246063699,
+      "fearGreed": {
+        "value": 10,
+        "classification": "Extreme fear",
+        "updated": "2026-11-26T14:23:10.024Z"
+      },
+      "global": {
+        "btcDominance": 58.775467916197,
+        "ethDominance": 10.003921255584,
+        "totalMarketCap": 2081868684962.06,
+        "totalVolume24h": 74832682386.52,
+        "marketCapChange24hPct": 4.60254787,
+        "updated": "2026-11-26T14:34:59.999Z"
+      },
+      "candles": {
+        "count": 30,
+        "first": 1793145600,
+        "last": 1795651200
+      },
+      "errors": []
+    },
+    "model": {
+      "pModel": 9.763082564617775e-10,
+      "risk": {
+        "score": 43,
+        "components": {
+          "vol": 0.5684220447223045,
+          "sentiment": 0.8,
+          "proximity": 1.361002752098608e-8
+        }
+      }
+    },
+    "cournot": {
+      "state": "complete",
+      "marketId": "113109",
+      "probability": 0.09999999999999998,
+      "result": null,
+      "inverted": true,
+      "sourceProbability": 0.9,
+      "cached": false,
+      "needsPayment": false,
+      "fetchedAt": 1795703795570,
+      "billing": "free_quota",
+      "freeQuota": {
+        "remaining": 1
+      }
+    }
+  },
+  "evidence": {
+    "cournotBasis": [
+      {
+        "source": "kalshi",
+        "summary": "kalshi latest yes price 0.9000 for \"BNB price above $450.00 at 2026-11-27 22:00 UTC\" (1 legs), ends 2026-11-27T22:00:00Z",
+        "time": "2026-11-26T14:32:35Z",
+        "url": "https://kalshi.com/markets/kxbnbd/kxbnbd-26nov2717?op_market_ticker=KXBNBD-26NOV2717-T449.99"
+      },
+      {
+        "source": "binance",
+        "summary": "Over the 15-day coverage period ending November 26, 2026, BNB fell -15.7556% from 657.1 to 553.57, recording a mark price of 552.88, an annualized volatility of 59.1063%, and a long-short ratio of 2.3602.",
+        "time": "2026-11-26T14:22:54.392Z",
+        "url": "https://www.binance.com/en/futures/BNBUSDT"
+      },
+      {
+        "source": "venues",
+        "summary": "Across venues, BNB mark prices span 552.22 to 552.88 with 24-hour gains between 3.201% and 3.618%, while funding rates range from -0.000002 to 0.0001 and 24-hour open interest changes fluctuate between -0.075071 and 0.00286.",
+        "time": "2026-11-26T14:22:54.392Z",
+        "url": "https://www.coinglass.com/currencies/BNB"
+      },
+      {
+        "source": "forecast",
+        "summary": "Across 3 models evaluated on 2026-11-26 for BNB, Kronos forecast upward movement with 75% probability, TimesFM projected up with 100% probability, and Chronos predicted up with 0% probability.",
+        "time": "2026-11-26T14:22:54.392Z",
+        "url": ""
+      }
+    ],
+    "lines": [
+      {
+        "source": "kalshi",
+        "summary": "kalshi latest yes price 0.9000 for \"BNB price above $450.00 at 2026-11-27 22:00 UTC\" (1 legs), ends 2026-11-27T22:00:00Z",
+        "url": "https://kalshi.com/markets/kxbnbd/kxbnbd-26nov2717?op_market_ticker=KXBNBD-26NOV2717-T449.99",
+        "time": "2026-11-26T14:32:35Z"
+      },
+      {
+        "source": "binance",
+        "summary": "Over the 15-day coverage period ending November 26, 2026, BNB fell -15.7556% from 657.1 to 553.57, recording a mark price of 552.88, an annualized volatility of 59.1063%, and a long-short ratio of 2.3602.",
+        "url": "https://www.binance.com/en/futures/BNBUSDT",
+        "time": "2026-11-26T14:22:54.392Z"
+      },
+      {
+        "source": "venues",
+        "summary": "Across venues, BNB mark prices span 552.22 to 552.88 with 24-hour gains between 3.201% and 3.618%, while funding rates range from -0.000002 to 0.0001 and 24-hour open interest changes fluctuate between -0.075071 and 0.00286.",
+        "url": "https://www.coinglass.com/currencies/BNB",
+        "time": "2026-11-26T14:22:54.392Z"
+      },
+      {
+        "source": "forecast",
+        "summary": "Across 3 models evaluated on 2026-11-26 for BNB, Kronos forecast upward movement with 75% probability, TimesFM projected up with 100% probability, and Chronos predicted up with 0% probability.",
+        "url": "",
+        "time": "2026-11-26T14:22:54.392Z"
+      }
+    ]
+  },
+  "decision": {
+    "pSooth": 0.02,
+    "pCournot": 0.09999999999999998,
+    "pModel": 9.763082564617775e-10,
+    "pStar": 0.060000000390523285,
+    "risk": 43,
+    "alerts": [],
+    "params": {
+      "edgeThreshold": 0.05,
+      "riskCap": 75,
+      "cournotWeight": 0.6,
+      "kellyMultiplier": 0.5,
+      "maxFraction": 0.1,
+      "bankroll": 100,
+      "gapAlert": 0.15,
+      "highRisk": 70,
+      "staleSec": 900
+    },
+    "edge": 0.04000000039052329,
+    "action": "HOLD",
+    "fraction": 0,
+    "sizeUsd": 0,
+    "reason": "Edge 4.0% is inside the threshold 5.0%."
+  },
+  "mode": "dry-run",
+  "cournotMessage": "BNB price above $450.00 at 2026-11-27 22:00 UTC"
+}

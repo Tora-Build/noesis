@@ -1,0 +1,201 @@
+{
+  "title": "EWZB price at or below $30.4 at 2026-12-01 21:00 UTC",
+  "asset": "EWZB",
+  "market": "0x22c7803f59803EB0B0771A715DEF5E00fF30687C",
+  "chainId": 56,
+  "generatedAt": "2026-11-26T14:37:18.000Z",
+  "proof": {
+    "chainId": 56,
+    "block": 135863849,
+    "blockHash": "0x2bdb9fc0b0357bf3d647a8a38262a0592bec0ed7d8a15d48f1f8d303a17e5f8c",
+    "blockTimestamp": 1795703838,
+    "amm": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+    "ammState": {
+      "qYes": "0",
+      "qNo": "996546308318607044507",
+      "priceWad": "269621000000000000"
+    },
+    "adjudicator": "0xa17feCd30c8E1c2C9BcfE19469f20EFF4e7e2be9",
+    "feed": {
+      "priceWad": "31103901283242772764",
+      "ts": 1795703780
+    }
+  },
+  "inputs": {
+    "sooth": {
+      "yesPrice": 0.269621,
+      "qYes": "0",
+      "qNo": "996546308318607044507",
+      "priceWad": "269621000000000000",
+      "tradingOpen": true,
+      "amm": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+      "phase": "ACTIVE"
+    },
+    "terms": {
+      "source": 0,
+      "feed": "0xEAcE519ebB14fB8404fA6DdD23C3b34abaDE44aa",
+      "feedId": "0x0000048d",
+      "kind": 1,
+      "strike": 30.4,
+      "strikeWad": "30400000000000000000",
+      "maxDelay": 300,
+      "kindName": "CLOSE_BELOW"
+    },
+    "deadline": 1796158800,
+    "deadlineIso": "2026-12-01T21:00:00.000Z",
+    "feed": {
+      "price": 31.103901283242774,
+      "priceWad": "31103901283242772764",
+      "ts": 1795703780,
+      "ageSec": 58
+    },
+    "spot": 31.103901283242774,
+    "spotSource": "onchain_feed",
+    "touched": false,
+    "cmc": {
+      "mode": "keyed",
+      "calls": [
+        {
+          "path": "/v3/cryptocurrency/quotes/latest",
+          "at": "2026-11-26T14:37:18.634Z",
+          "status": 200
+        },
+        {
+          "path": "/v1/k-line/candles",
+          "at": "2026-11-26T14:37:19.171Z",
+          "status": 200
+        },
+        {
+          "path": "/v3/fear-and-greed/latest",
+          "at": "2026-11-26T14:37:19.579Z",
+          "status": 200
+        },
+        {
+          "path": "/v1/global-metrics/quotes/latest",
+          "at": "2026-11-26T14:37:19.846Z",
+          "status": 200
+        }
+      ],
+      "spot": 31.067151793694986,
+      "sigma": 0.42005528488194355,
+      "sigmaSource": "cmc_price_changes",
+      "pct24h": 6.049669616595,
+      "pct7d": 3.275007336825,
+      "pct30d": 0.684101344987,
+      "fearGreed": {
+        "value": 10,
+        "classification": "Extreme fear",
+        "updated": "2026-11-26T14:23:10.024Z"
+      },
+      "global": {
+        "btcDominance": 58.768144488006,
+        "ethDominance": 10.001238944912,
+        "totalMarketCap": 2081037791848.3433,
+        "totalVolume24h": 74762740943.62,
+        "marketCapChange24hPct": 4.61591191,
+        "updated": "2026-11-26T14:35:59.999Z"
+      },
+      "candles": {
+        "count": 0,
+        "first": null,
+        "last": null
+      },
+      "errors": []
+    },
+    "model": {
+      "pModel": 0.33415382454658293,
+      "risk": {
+        "score": 68,
+        "components": {
+          "vol": 0.42005528488194355,
+          "sentiment": 0.8,
+          "proximity": 0.9021980977964608
+        }
+      }
+    },
+    "cournot": {
+      "state": "skipped",
+      "marketId": null,
+      "probability": null,
+      "result": null,
+      "inverted": false,
+      "sourceProbability": null,
+      "cached": false,
+      "needsPayment": false,
+      "fetchedAt": null,
+      "billing": null,
+      "freeQuota": null
+    }
+  },
+  "evidence": {
+    "cournotBasis": null,
+    "lines": []
+  },
+  "decision": {
+    "pSooth": 0.269621,
+    "pCournot": null,
+    "pModel": 0.33415382454658293,
+    "pStar": 0.33415382454658293,
+    "risk": 68,
+    "alerts": [],
+    "params": {
+      "edgeThreshold": 0.05,
+      "riskCap": 75,
+      "cournotWeight": 0.6,
+      "kellyMultiplier": 0.5,
+      "maxFraction": 0.1,
+      "bankroll": 100,
+      "gapAlert": 0.15,
+      "highRisk": 70,
+      "staleSec": 900
+    },
+    "edge": 0.06453282454658293,
+    "action": "BUY_YES",
+    "outcome": 1,
+    "kelly": 0.0883552574027771,
+    "fraction": 0.014136841184444334,
+    "sizeUsd": 1.41,
+    "entryPrice": 0.269621,
+    "reason": "Fair 33.4% vs Sooth 27.0%: edge 6.5%, risk 68.",
+    "sizing": {
+      "shares": 5.167959871398926,
+      "netAmount": 1.409982542456141,
+      "newPrice": 0.2706399140066957
+    }
+  },
+  "mode": "execute",
+  "cournotMessage": "EWZB price at or below $30.4 at 2026-12-01 21:00 UTC",
+  "tx": {
+    "from": "0x7BeA49490cc8Bef493A732ed6b1380B10E420243",
+    "quote": {
+      "cost": 1.396022319263506,
+      "fee": 0.013960223192635058,
+      "netAmount": 1.409982542456141,
+      "newPrice": 0.2706399140066957,
+      "maxIn": 1.4381821933052636,
+      "needNative": "1438182193305263741"
+    },
+    "args": {
+      "market": "0x22c7803f59803EB0B0771A715DEF5E00fF30687C",
+      "outcome": 1,
+      "deltaShares": "5167959871398925781",
+      "maxIn": "1438182193305263741"
+    },
+    "approval": {
+      "to": "0x43614DeE734791F241328a8d70fC4c975ccC3778",
+      "data": "0x095ea7b3000000000000000000000000dcb89db01415885ff8ec1f74e50386c8673b055700000000000000000000000000000000000000000000000013f57315c2409e7d",
+      "value": "0",
+      "amount": "1438182193305263741"
+    },
+    "trade": {
+      "to": "0xDcb89dB01415885FF8EC1F74E50386C8673B0557",
+      "data": "0x5910cce400000000000000000000000022c7803f59803eb0b0771a715def5e00ff30687c000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000047b8481f3c34d5d500000000000000000000000000000000000000000000000013f57315c2409e7d",
+      "value": "0"
+    },
+    "sent": {
+      "approval": "0x029e318a06791ce14b6cdfd81007cac6a29e2ef3a871b0cb63d840cc4c219a38",
+      "trade": "0xcd64e62dd3398972d0cce2f0260692e4dab4f784135307eab17570672c1fb9cc",
+      "status": "success"
+    }
+  }
+}
