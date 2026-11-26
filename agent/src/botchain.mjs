@@ -104,6 +104,13 @@ export async function syncMarkets({ client, logClient, deployment, state, confir
       const market = getAddress(l.args.market);
       if (state.markets[market]) continue;
       const terms = await retry(() => client.readContract({ address: deployment.adjudicator, abi: adjudicatorAbi, functionName: "terms", args: [market] }));
+      // Same rule as the page build: skip a market whose question names another strike
+      // than its on-chain terms (a creation typo). Never trade or settle it.
+      const named = /\$([\d,]+(?:\.\d+)?)/.exec(l.args.question)?.[1];
+      if (named && Math.abs(Number(named.replace(/,/g, "")) - Number(terms.strikeWad) / 1e18) > 1e-6) {
+        log({ job: "sync", action: "MARKET_SKIPPED", market, reason: `question says $${named}, terms say $${Number(terms.strikeWad) / 1e18}` });
+        continue;
+      }
       state.markets[market] = marketRecord(l.args, terms, l.blockNumber);
       added++;
       log({ job: "sync", action: "MARKET_FOUND", market, question: l.args.question });
