@@ -4,38 +4,31 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NOESIS · Price the Unknown</title>
-  <meta name="description" content="NOESIS turns market uncertainty into risk protection you can trade and verify on BNB Chain.">
+  <meta name="description" content="NOESIS transforms market uncertainty into programmable financial protection on BNB Chain.">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#0B0D12">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3CclipPath id='c'%3E%3Ccircle cx='32' cy='32' r='24'/%3E%3C/clipPath%3E%3Cmask id='m' maskUnits='userSpaceOnUse' x='0' y='0' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23fff'/%3E%3Cellipse cx='29' cy='29' rx='34' ry='12' transform='rotate(-45 29 29)'/%3E%3C/mask%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%230B0D12'/%3E%3Cg transform='translate(7 7) scale(.78)'%3E%3Cg clip-path='url(%23c)'%3E%3Cpath d='M70-6V70H-6Z' fill='%23FFD200' mask='url(%23m)'/%3E%3Cellipse cx='29' cy='29' rx='34' ry='12' transform='rotate(-45 29 29)' fill='none' stroke='%23fff' stroke-width='6'/%3E%3C/g%3E%3Ccircle cx='32' cy='32' r='26.5' fill='none' stroke='%23fff' stroke-width='6'/%3E%3Ccircle cx='28' cy='30' r='3.6' fill='%23fff'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="icon" type="image/svg+xml" href="mark.svg">
 </head>
 <body>
-  <a class="skip" href="#protect">Skip to the price floor</a>
+  <a class="skip" href="#protect">Skip to protection</a>
 
   <header class="bar on-dark">
     <div class="bar-in">
       <a class="brand" href="#top" aria-label="NOESIS, home">
-        <svg class="mark" viewBox="0 0 64 64" width="26" height="26" aria-hidden="true">
-          <defs>
-            <clipPath id="nm1c"><circle cx="32" cy="32" r="24"/></clipPath>
-            <mask id="nm1m" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"/><ellipse cx="29" cy="29" rx="34" ry="12" transform="rotate(-45 29 29)" fill="#000"/></mask>
-          </defs>
-          <g clip-path="url(#nm1c)"><path d="M70-6V70H-6Z" fill="#FFD200" mask="url(#nm1m)"/><ellipse cx="29" cy="29" rx="34" ry="12" transform="rotate(-45 29 29)" fill="none" stroke="currentColor" stroke-width="6"/></g>
-          <circle cx="32" cy="32" r="26.5" fill="none" stroke="currentColor" stroke-width="6"/>
-          <circle cx="28" cy="30" r="3.6" fill="currentColor"/>
-        </svg>
+        <svg class="mark" viewBox="27 -4 106 106" width="26" height="26" aria-hidden="true" focusable="false"><g fill="#F9F4E3" stroke="#F9F4E3" stroke-width="19"><circle cx="80" cy="49" r="39"/><ellipse cx="80" cy="49" rx="43" ry="14" transform="rotate(-47 80 49)"/></g><circle cx="80" cy="49" r="39" fill="#FFD200"/><path d="M47 68 A39 39 0 0 1 106 20 Z" fill="#F9F4E3"/><ellipse cx="80" cy="49" rx="43" ry="14" transform="rotate(-47 80 49)" fill="#F9F4E3" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="39" fill="none" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="5" fill="#0B0D12"/></svg>
         <span class="word">NOESIS</span>
       </a>
       <nav class="nav" aria-label="Sections">
         <a href="#protect">Protect</a>
-        <a href="#paths">Outcomes</a>
+        <a href="#chances">Chances</a>
         <a href="#strikes">Levels</a>
+        <a href="#intel">Market data</a>
         <a href="#agent">Risk agent</a>
-        <a href="#how-it-works">How it works</a>
+        <a href="#oracle">Oracle</a>
       </nav>
       <div class="bar-end">
         <span class="net" id="net" title="Network and latest block"><i class="dot" aria-hidden="true"></i><span>BNB Chain</span><span class="mono muted" id="block"></span></span>
@@ -43,6 +36,7 @@
         <button class="btn btn-amber" id="connect">Connect wallet</button>
       </div>
     </div>
+    <p class="demo-strip">Live on BSC mainnet. Paid in hUSD-DEMO, demo money with no value.</p>
   </header>
 
   <section class="cover on-dark" id="top" aria-labelledby="hero-h">
@@ -84,10 +78,10 @@
       <p class="eyebrow">Autonomous financial intelligence infrastructure</p>
       <h1 id="hero-h">Price the Unknown.</h1>
       <span class="rule-amber" aria-hidden="true"></span>
-      <p class="cover-lede">NOESIS turns market uncertainty into risk protection you can trade and verify on chain.</p>
-      <p class="cover-sub">It joins market data from CoinMarketCap, chances from Cournot, prices from the Sooth AMM on BNB Chain and settlement by the Atlas Oracle.</p>
+      <p class="cover-lede">Transform market uncertainty into programmable financial protection.</p>
+      <p class="cover-sub">It joins market data from CoinMarketCap, chances from Cournot, prices from the Sooth AMM on BNB Chain and settlement by the Atlas Oracle or Chainlink.</p>
       <div class="cover-cta">
-        <a class="btn btn-amber btn-lg" href="#protect">Set a floor <span aria-hidden="true">→</span></a>
+        <a class="btn btn-amber btn-lg" href="#protect">Create protection <span aria-hidden="true">→</span></a>
         <a class="btn btn-line btn-lg" href="#how-it-works">How it works</a>
       </div>
       <p class="cover-live" id="heroLive"><span class="skel" aria-hidden="true"></span></p>
@@ -98,8 +92,8 @@
     <section class="app" id="protect" aria-labelledby="app-h">
       <div class="app-head">
         <p class="kicker">Risk protection</p>
-        <h2 id="app-h">Set a floor under your price.</h2>
-        <p class="lede">Drag the amber line. If the price ends at or below it, you get paid.</p>
+        <h2 id="app-h">Define your downside protection.</h2>
+        <p class="lede">Drag the amber line or type a level. If the price at the deadline is at or below the level, you get the payout. If it ends above, you get nothing. It is a payout, not a guaranteed floor.</p>
       </div>
 
       <div class="folio" id="folio" hidden>
@@ -123,10 +117,16 @@
         <div class="chart" id="chart">
           <div class="chart-top">
             <p class="now"><span class="now-k" id="nowK">-</span> <span class="now-p mono" id="nowP"><span class="skel" aria-hidden="true"></span></span> <span class="now-age muted" id="nowAge"></span></p>
-            <p class="chart-cap muted" id="chartCap"></p>
+            <div class="lvl-in">
+              <label for="lvlInput">Level</label>
+              <span class="amt-field"><span aria-hidden="true">$</span><input id="lvlInput" class="field num" type="number" inputmode="decimal" step="any" list="lvlList" aria-describedby="lvlHint" autocomplete="off"></span>
+              <datalist id="lvlList"></datalist>
+              <span id="lvlHint" class="sr">Only levels with a market. A typed price snaps to the nearest level. Arrow up and down step through the levels.</span>
+            </div>
           </div>
+          <p class="chart-cap muted" id="chartCap"></p>
           <div class="plot" id="plot">
-            <svg id="svg" aria-labelledby="svgTitle" role="group"><title id="svgTitle">Price chart with a floor line</title></svg>
+            <svg id="svg" aria-labelledby="svgTitle" role="group"><title id="svgTitle">Price chart with a protection level line</title></svg>
             <div class="tag" id="tag" aria-hidden="true"></div>
             <p class="plot-msg" id="plotMsg" hidden></p>
           </div>
@@ -140,15 +140,19 @@
               <span class="ro-sub" id="roPaySub">&nbsp;</span>
             </div>
             <div class="ro-cell" aria-live="polite" aria-atomic="true">
-              <span class="ro-k">Costs now</span>
+              <span class="ro-k">You pay now</span>
               <span class="ro-big mono" id="roCost">-</span>
               <span class="ro-sub" id="roChance">&nbsp;</span>
             </div>
           </div>
+          <dl class="ro-pr">
+            <div><dt>Market price</dt><dd class="mono" id="roMkt">-</dd><dd class="ro-pr-n">The AMM price you can buy at now, per $1 of payout.</dd></div>
+            <div><dt>Agent estimate</dt><dd class="mono" id="roAg">-</dd><dd class="ro-pr-n">The risk agent's fair chance. Not a price you can trade.</dd></div>
+          </dl>
           <ol class="legs" id="legs" hidden></ol>
           <form id="form" class="order" novalidate>
             <div class="amount">
-              <label class="amt-k" for="amt">Get paid</label>
+              <label class="amt-k" for="amt">Payout</label>
               <span class="amt-field"><span aria-hidden="true">$</span><input id="amt" class="field num" type="number" inputmode="decimal" min="0" step="any" value="500" aria-describedby="amtNote"></span>
               <div class="chips" role="group" aria-label="Preset amounts">
                 <button type="button" class="chip" data-amt="100">$100</button>
@@ -160,7 +164,7 @@
             <p class="amt-note" id="amtNote"></p>
             <p class="form-msg" id="formMsg" role="status"></p>
             <div class="cta">
-              <p class="cta-note" id="ctaNote">Paid in hUSD-DEMO. The oracle price decides.</p>
+              <p class="cta-note" id="ctaNote">Paid in hUSD-DEMO. The oracle price at the deadline decides.</p>
               <button type="submit" class="btn btn-cta" id="protectBtn" disabled>Protect</button>
             </div>
             <p class="faucet-inline small muted">Need test money? <button class="btn-link" type="button" data-faucet>Get 1,000 hUSD-DEMO</button></p>
@@ -180,21 +184,19 @@
     </section>
 
     <div class="duo">
-      <section class="panel paths" id="paths" aria-labelledby="paths-h">
+      <section class="panel chances" id="chances" aria-labelledby="chances-h">
         <div class="panel-head">
-          <h2 id="paths-h" class="panel-h">Multi-path outcomes</h2>
-          <p class="muted small" id="pathsWhen"></p>
+          <h2 id="chances-h" class="panel-h">Chance by level</h2>
+          <p class="muted small" id="chWhen"></p>
         </div>
-        <div class="paths-plot" id="pathsPlot">
-          <svg id="pathsSvg" role="img" aria-labelledby="pathsTitle"><title id="pathsTitle">Outcome paths</title></svg>
-          <p class="mp-msg" id="pathsMsg"><span class="skel skel-w"></span></p>
-        </div>
-        <p class="small muted paths-note">From the price now to each open level. p is the market's chance that the price ends at or below the level, from the Sooth AMM price. Fair is the risk agent's price.</p>
+        <p class="ch-key small" aria-hidden="true"><span><i class="k-bar"></i>Market price</span><span><i class="k-mk"></i>Agent estimate</span></p>
+        <ul class="ch-list" id="chList"><li class="empty"><span class="skel skel-w"></span></li></ul>
+        <p class="small muted ch-note">Chances at the deadline from the market and the agent. Not a price forecast.</p>
       </section>
 
       <section class="panel ladder" id="strikes" aria-labelledby="ladder-h">
         <div class="panel-head">
-          <h2 id="ladder-h" class="panel-h">Levels for <span id="lAsset">-</span></h2>
+          <h2 id="ladder-h" class="panel-h">Levels for <span id="lAsset">-</span> <span id="lSrc"></span></h2>
           <p class="muted small" id="lWhen"></p>
         </div>
         <div class="table-scroll">
@@ -203,8 +205,8 @@
               <tr>
                 <th scope="col">Level</th>
                 <th scope="col" class="r c-dist">From now</th>
-                <th scope="col" class="r">Price per $1</th>
-                <th scope="col" class="r">Fair</th>
+                <th scope="col" class="r">Market price</th>
+                <th scope="col" class="r">Agent estimate</th>
                 <th scope="col" class="r c-cour">Cournot</th>
                 <th scope="col" class="c-ag">Agent</th>
                 <th scope="col" class="r c-you">You have</th>
@@ -217,7 +219,7 @@
         <details class="more" id="trader">
           <summary>Details: trader view</summary>
           <div class="trader-in">
-            <p class="small muted">Price is the live AMM price per $1 of payout. Fair is the agent's price. Cournot is an AI oracle's chance. Trade YES or NO shares on the selected level here.</p>
+            <p class="small muted">Market price is the live AMM price per $1 of payout. You can buy at it now. Agent estimate is the risk agent's fair chance, not a price you can trade. Cournot is an AI oracle's chance. Trade YES or NO shares on the selected level here.</p>
             <div class="trader-row"><span class="mono small" id="tMarket">-</span></div>
             <div class="trader-row">
               <div class="seg" role="radiogroup" aria-label="Side">
@@ -238,12 +240,35 @@
     </div>
 
     <div class="pair">
+      <section class="panel intel" id="intel" aria-labelledby="intel-h">
+        <div class="panel-head">
+          <h2 id="intel-h" class="panel-h">Market intelligence</h2>
+          <p class="muted small" id="inWhen"></p>
+        </div>
+        <div id="inBody"><p class="empty">No CoinMarketCap data for this level yet.</p></div>
+      </section>
+
       <section class="panel agent" id="agent" aria-labelledby="agent-h">
         <div class="panel-head">
           <h2 id="agent-h" class="panel-h">Risk agent</h2>
           <p class="muted small" id="agWhen"></p>
         </div>
         <div id="agBody"><p class="empty">No agent report for this level yet.</p></div>
+        <div class="ag-foot">
+          <button type="button" class="btn btn-sm" id="agRefresh">Refresh</button>
+          <span class="small muted" id="agRefMsg" role="status"></span>
+        </div>
+        <p class="small muted ag-line">Rule-based agent. It trades on its own with a daily cap. Cournot (AI oracle) is one input when a matching market exists.</p>
+      </section>
+    </div>
+
+    <div class="pair">
+      <section class="panel oracle" id="oracle" aria-labelledby="oracle-h">
+        <div class="panel-head">
+          <h2 id="oracle-h" class="panel-h">Oracle</h2>
+          <p class="muted small">Read on chain, no API key.</p>
+        </div>
+        <div id="orBody"><p class="empty"><span class="skel skel-w"></span></p></div>
       </section>
 
       <section class="panel settled" id="settled" aria-labelledby="settled-h">
@@ -262,17 +287,17 @@
       </div>
       <ol class="stack" aria-label="The stack">
         <li><span class="stack-n">01</span><b>Market data</b><span>CoinMarketCap prices, volatility and sentiment.</span></li>
-        <li><span class="stack-n">02</span><b>Probabilistic intelligence</b><span>Cournot, an AI oracle, gives a chance for each level.</span></li>
+        <li><span class="stack-n">02</span><b>Probabilistic intelligence</b><span>Cournot, an AI oracle, gives a chance when it has a matching market.</span></li>
         <li><span class="stack-n">03</span><b>Market pricing</b><span>The Sooth AMM on BNB Chain sets the live price of cover.</span></li>
         <li><span class="stack-n">04</span><b>Oracle settlement</b><span>The Atlas Oracle price decides the result. Chainlink for BNB.</span></li>
       </ol>
       <ul class="features">
-        <li><h3>AI risk intelligence</h3><p>The risk agent reads CoinMarketCap data and the Cournot chance. Fixed rules turn them into a fair price.</p></li>
-        <li><h3>Probabilistic risk pricing</h3><p>Each level has a chance. The AMM price is the market's chance. The agent writes its own.</p></li>
-        <li><h3>On-chain risk hedging</h3><p>Cover is a share in a market on BNB Chain. Each $1 of cover pays $1 if the level is hit.</p></li>
+        <li><h3>AI risk intelligence</h3><p>The risk agent reads CoinMarketCap data and, when it exists, the Cournot chance. Fixed rules turn them into a fair chance.</p></li>
+        <li><h3>Probabilistic risk pricing</h3><p>Each level has a chance. The AMM price is the market's chance, and you can buy at it. The agent writes its own estimate.</p></li>
+        <li><h3>On-chain risk hedging</h3><p>Cover is a share in a market on BNB Chain. Each $1 of cover pays $1 if the price at the deadline is at or below the level.</p></li>
         <li><h3>Programmable risk markets</h3><p>Each market has a fixed feed, level and end time. Nobody can change them after it opens.</p></li>
         <li><h3>Portfolio protection</h3><p>Connect a wallet. Size cover from the IWMB, EWZB or BNB you really hold.</p></li>
-        <li><h3>Automated settlement</h3><p>After the end time, anyone can settle from the oracle price. Nobody votes.</p></li>
+        <li><h3>Automated settlement</h3><p>At the deadline, anyone can settle from the oracle price. Nobody votes.</p></li>
       </ul>
 
       <details class="more how" id="how">
@@ -291,15 +316,7 @@
     <div class="foot-in">
       <div class="foot-brand">
         <span class="brand">
-          <svg class="mark" viewBox="0 0 64 64" width="24" height="24" aria-hidden="true">
-            <defs>
-              <clipPath id="nm2c"><circle cx="32" cy="32" r="24"/></clipPath>
-              <mask id="nm2m" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64"><rect width="64" height="64" fill="#fff"/><ellipse cx="29" cy="29" rx="34" ry="12" transform="rotate(-45 29 29)" fill="#000"/></mask>
-            </defs>
-            <g clip-path="url(#nm2c)"><path d="M70-6V70H-6Z" fill="#FFD200" mask="url(#nm2m)"/><ellipse cx="29" cy="29" rx="34" ry="12" transform="rotate(-45 29 29)" fill="none" stroke="currentColor" stroke-width="6"/></g>
-            <circle cx="32" cy="32" r="26.5" fill="none" stroke="currentColor" stroke-width="6"/>
-            <circle cx="28" cy="30" r="3.6" fill="currentColor"/>
-          </svg>
+          <svg class="mark" viewBox="27 -4 106 106" width="24" height="24" aria-hidden="true" focusable="false"><g fill="#F9F4E3" stroke="#F9F4E3" stroke-width="19"><circle cx="80" cy="49" r="39"/><ellipse cx="80" cy="49" rx="43" ry="14" transform="rotate(-47 80 49)"/></g><circle cx="80" cy="49" r="39" fill="#FFD200"/><path d="M47 68 A39 39 0 0 1 106 20 Z" fill="#F9F4E3"/><ellipse cx="80" cy="49" rx="43" ry="14" transform="rotate(-47 80 49)" fill="#F9F4E3" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="39" fill="none" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="5" fill="#0B0D12"/></svg>
           <span class="word">NOESIS</span>
         </span>
         <p>Price the Unknown.</p>
@@ -312,9 +329,14 @@
 
   <dialog id="confirm" aria-labelledby="cf-h">
     <form method="dialog" class="cf">
-      <h2 id="cf-h">Confirm your floor</h2>
+      <h2 id="cf-h">Confirm your protection</h2>
       <p class="cf-what" id="cfWhat"></p>
-      <table class="cf-legs" id="cfLegs"></table>
+      <dl class="kv cf-kv" id="cfSum"></dl>
+      <h3 class="cf-sub">Levels</h3>
+      <div class="cf-scroll"><table class="cf-legs" id="cfLegs"></table></div>
+      <h3 class="cf-sub">If the price at the deadline ends</h3>
+      <div class="cf-scroll"><table class="cf-legs" id="cfScen"></table></div>
+      <p class="small muted cf-note" id="cfScenNote"></p>
       <dl class="kv cf-kv" id="cfRows"></dl>
       <ol class="cf-steps" id="cfSteps"></ol>
       <p class="form-msg" id="cfMsg" role="status"></p>
