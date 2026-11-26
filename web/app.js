@@ -30,6 +30,7 @@ const ERC20 = parseAbi([
   'function approve(address, uint256) returns (bool)',
   'function balanceOf(address) view returns (uint256)',
   'function faucet()',
+  'function lastFaucet(address) view returns (uint256)',
   'function decimals() view returns (uint8)',
 ]);
 // Chainlink proxy, for BNB price history (past rounds are on chain).
@@ -135,8 +136,10 @@ function humanError(e) {
   if (/TooEarly/.test(m)) return 'The market time is not over yet.';
   if (/StalePrice/.test(m)) return 'No feed price after the market time yet. Try again after the next update.';
   if (/NoPosition/.test(m)) return 'This wallet has no shares in this market.';
+  if (/ONCE_A_DAY/.test(m)) return 'This wallet already got hUSD-DEMO in the last 24 hours. The faucet gives 1,000 once a day per wallet.';
   if (/insufficient|exceeds balance/i.test(m)) return 'Not enough hUSD-DEMO. Get hUSD-DEMO first.';
-  return (e?.shortMessage ?? e?.message ?? 'Something went wrong.').split('\n')[0];
+  // Keep the revert reason: viem puts it on the line after "reverted with the following reason:".
+  return (e?.shortMessage ?? e?.message ?? 'Something went wrong.').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 2).join(' ');
 }
 
 // ── Market model ─────────────────────────────────────────────────────
@@ -1423,6 +1426,14 @@ $('#faucet').hidden = !cfg.faucet;
 const faucet = async (ev) => {
   const b = ev.currentTarget; b.disabled = true;
   try {
+    if (!S.wallet || !S.account) await connect();
+    // Once a day per wallet: check first, so no transaction fails.
+    const last = Number(await pub.readContract({ address: cfg.stable, abi: ERC20, functionName: 'lastFaucet', args: [S.account] }));
+    const next = last + 86400;
+    if (last && Date.now() / 1000 < next) {
+      toast(`This wallet already got hUSD-DEMO today. Next faucet: ${esc(when(next))}.`);
+      b.disabled = false; return;
+    }
     const hash = await send(cfg.stable, ERC20, 'faucet', []);
     toast(`1,000 hUSD-DEMO sent. ${link(txUrl(hash), 'View tx')}`);
     await loadPositions(); validateQuote();
