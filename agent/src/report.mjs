@@ -83,6 +83,7 @@ export function analyze({ chain, snapshot, cournot = null, asset, opts = {} }) {
       model: { pModel, risk },
       cournot: cournot && {
         state: cournot.state, marketId: cournot.marketId ?? null, probability: pCournot, result: cournot.result ?? null,
+        inverted: cournot.inverted ?? false, sourceProbability: cournot.sourceProbability ?? null,
         cached: cournot.cached ?? false, needsPayment: !!cournot.needsPayment, fetchedAt: cournot.fetchedAt ?? null,
         billing: cournot.billing ?? null, freeQuota: cournot.freeQuota ?? null,
       },

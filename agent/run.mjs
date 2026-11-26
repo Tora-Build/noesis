@@ -30,6 +30,8 @@ const { values: args } = parseArgs({
     "cournot-message": { type: "string" },
     "no-cournot": { type: "boolean", default: false },
     "refresh-cournot": { type: "boolean", default: false },
+    // The Cournot market states the opposite claim (for example "above $465" for our "below $465").
+    "cournot-invert": { type: "boolean", default: false },
     bankroll: { type: "string" },
     threshold: { type: "string" },
     slippage: { type: "string", default: "0.02" },
@@ -122,6 +124,10 @@ async function runOnline() {
       const force = args["refresh-cournot"];
       log(`Cournot probability for market ${args["cournot-id"]} (${force ? "refresh: this spends a call" : "cached forever per id; --refresh-cournot to call again"})…`);
       c = await cournot.probability(args["cournot-id"], message, { force });
+      if (args["cournot-invert"] && c.state === "complete" && Number.isFinite(c.probability)) {
+        c = { ...c, sourceProbability: c.probability, probability: 1 - c.probability, inverted: true };
+        log(`Cournot states the opposite claim: using 1 - ${c.sourceProbability.toFixed(3)}.`);
+      }
     } else {
       // resolve is free. Probability is only called with an explicit --cournot-id.
       const r = await cournot.resolve(message, { limit: 5 }).catch((e) => ({ state: "network_error", error: e.message, candidates: [] }));
