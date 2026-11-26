@@ -2,7 +2,7 @@ import "./_no-network.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { parseQuotes, parseCandles, parseFearGreed, parseGlobal, realizedVol, buildSnapshot, cmcRequest, cmcConfig, KEYLESS_BASE, KEYED_BASE } from "../src/cmc.mjs";
+import { parseQuotes, parseCandles, parseFearGreed, parseGlobal, realizedVol, changeVol, buildSnapshot, cmcRequest, cmcConfig, KEYLESS_BASE, KEYED_BASE } from "../src/cmc.mjs";
 
 const fx = (f) => JSON.parse(readFileSync(new URL(`./fixtures/${f}`, import.meta.url)));
 
@@ -46,9 +46,21 @@ test("buildSnapshot uses candles, falls back to default sigma", () => {
   assert.equal(bnb.sigmaSource, "realized_1d_candles");
   assert.ok(bnb.sigma > 0.1 && bnb.sigma < 2);
   const iwm = buildSnapshot({ symbol: "IWMB", quotes, candles: [] });
-  assert.equal(iwm.sigmaSource, "default");
-  assert.equal(iwm.sigma, 0.25);
   assert.ok(iwm.spot > 0);
+  if (iwm.sigmaSource === "cmc_price_changes") assert.ok(iwm.sigma > 0 && iwm.sigmaDetail.prior === 0.25);
+  else { assert.equal(iwm.sigmaSource, "default"); assert.equal(iwm.sigma, 0.25); }
+  const none = buildSnapshot({ symbol: "IWMB", quotes: {}, candles: [] });
+  assert.equal(none.sigmaSource, "default");
+  assert.equal(none.sigma, 0.25);
+});
+
+test("changeVol scales CMC percent changes to a yearly volatility", () => {
+  // 1% a day over 1 and 7 days: mean daily variance (1e-4 + (ln 1.07)^2 / 7) / 2.
+  const v = changeVol({ pct24h: 1, pct7d: 7 });
+  const expect = Math.sqrt(((Math.log(1.01) ** 2) + Math.log(1.07) ** 2 / 7) / 2 * 365);
+  assert.ok(Math.abs(v - expect) < 1e-12);
+  assert.equal(changeVol({ pct24h: 1 }), null, "needs two windows");
+  assert.equal(changeVol(null), null);
 });
 
 test("cmcConfig: keyless by default, header when CMC_API_KEY set", () => {

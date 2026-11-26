@@ -85,6 +85,8 @@ export function parseQuotes(json) {
       pct24h: q.percent_change_24h,
       pct7d: q.percent_change_7d,
       pct30d: q.percent_change_30d,
+      pct60d: q.percent_change_60d,
+      pct90d: q.percent_change_90d,
       lastUpdated: q.last_updated ?? d.last_updated,
       tokenAddress: d.platform?.token_address ?? null,
     };
@@ -132,18 +134,39 @@ export function realizedVol(closes, periodsPerYear = 365) {
   return Math.sqrt(variance) * Math.sqrt(periodsPerYear);
 }
 
+/**
+ * Annualized volatility from CMC percent changes over 1, 7, 30, 60 and 90 days.
+ * Each window gives one squared log return per day; the mean is scaled to a year.
+ * Used when no daily candles exist (CMC has no DEX candles for tokenized stocks and the
+ * free plan has no OHLCV history). Needs at least two windows. Rough, so the caller
+ * blends it with the asset's prior.
+ */
+export function changeVol(quote) {
+  if (!quote) return null;
+  const windows = [[quote.pct24h, 1], [quote.pct7d, 7], [quote.pct30d, 30], [quote.pct60d, 60], [quote.pct90d, 90]]
+    .filter(([p]) => Number.isFinite(p) && p > -100);
+  if (windows.length < 2) return null;
+  const perDay = windows.reduce((a, [p, d]) => a + Math.log(1 + p / 100) ** 2 / d, 0) / windows.length;
+  return Math.sqrt(perDay * 365);
+}
+
 /** Combine parsed pieces into one market snapshot. Pure. */
 export function buildSnapshot({ symbol, asset = ASSETS[symbol] ?? {}, quotes, candles, fearGreed, global }) {
   const quote = asset.cmcId != null ? quotes?.[asset.cmcId] ?? null : null;
   const closes = (candles ?? []).map((c) => c.c);
   const rv = closes.length >= 5 ? realizedVol(closes) : null;
+  const prior = asset.defaultSigma ?? 0.6;
+  const cv = rv == null ? changeVol(quote) : null;
+  // Half CMC estimate, half prior (in variance): a few windows are a noisy sample.
+  const fromChanges = cv != null ? Math.sqrt((cv ** 2 + prior ** 2) / 2) : null;
   return {
     symbol,
     spot: quote?.price ?? null,
     quote,
     candles: { count: closes.length, first: candles?.[0]?.t ?? null, last: candles?.at?.(-1)?.t ?? null },
-    sigma: rv ?? asset.defaultSigma ?? 0.6,
-    sigmaSource: rv != null ? "realized_1d_candles" : "default",
+    sigma: rv ?? fromChanges ?? prior,
+    sigmaSource: rv != null ? "realized_1d_candles" : fromChanges != null ? "cmc_price_changes" : "default",
+    sigmaDetail: fromChanges != null ? { cmc: cv, prior, blend: "sqrt((cmc^2 + prior^2) / 2)" } : null,
     fearGreed: fearGreed ?? null,
     global: global ?? null,
   };

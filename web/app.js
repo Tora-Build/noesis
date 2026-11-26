@@ -521,6 +521,7 @@ async function traderQuote() {
 // Plain words for where the volatility came from. Honest: a default is a guess, not data.
 function sigmaText(c) {
   if (c.sigmaSource === 'realized_1d_candles') return `realized, ${num(c.candles?.count) ?? 30} daily CMC DEX candles`;
+  if (c.sigmaSource === 'cmc_price_changes') return 'from CMC 24h to 90d price changes, blended 50/50 with a prior';
   if (c.sigmaSource === 'default') return 'fixed default for this asset, no CMC candles';
   return c.sigmaSource ? String(c.sigmaSource) : '';
 }

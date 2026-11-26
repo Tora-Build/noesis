@@ -107,7 +107,8 @@ async function main() {
     };
     console.log(`- ${question}: start price ${(prob * 100).toFixed(1)}%, depth ${bbase}, max trade ${maxInput}`);
     if (dry) continue;
-    const r = spawnSync('forge', ['script', 'script/DeployHedge.s.sol:CreateMarket', '--rpc-url', rpc, '--broadcast', '--slow'],
+    const r = spawnSync('forge', ['script', 'script/DeployHedge.s.sol:CreateMarket', '--rpc-url', rpc, '--broadcast', '--slow',
+      ...(process.env.FORGE_EXTRA ? process.env.FORGE_EXTRA.split(/\s+/).filter(Boolean) : [])],
       { cwd: new URL('../contracts/', import.meta.url).pathname, env, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' });
     if (r.status !== 0) { console.error(r.stdout.split(rpc).join('[rpc]')); throw new Error(`CreateMarket failed for strike ${strike}`); }
     console.log('  created (read the real address from MarketCreated events: npm run web:config)');
