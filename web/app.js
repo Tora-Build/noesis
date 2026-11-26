@@ -102,6 +102,8 @@ const usd = (n, dp = 2) => (n == null || !Number.isFinite(n) ? '-' : `${n < 0 ? 
 const cents = (p) => (p == null || !Number.isFinite(p) ? '-' : `${(p * 100).toFixed(1)}¢`);
 const pct = (p, dp = 1) => (p == null || !Number.isFinite(p) ? '-' : `${(p * 100).toFixed(dp)}%`);
 const signed = (x, dp = 2) => (x == null || !Number.isFinite(x) ? '-' : `${x > 0 ? '+' : x < 0 ? '−' : ''}${Math.abs(x).toFixed(dp)}%`);
+// Short money for tight spots: $1,234 / $12.3k / $1.2M.
+const compactUsd = (n) => (Math.abs(n) >= 1e6 ? `$${(Math.floor(n / 1e5) / 10).toFixed(1)}M` : Math.abs(n) >= 1e4 ? `$${(Math.floor(n / 1e2) / 10).toFixed(1)}k` : usd(n, 0));
 const short = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 const DATE_FMT = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' });
 const when = (ts) => `${DATE_FMT.format(new Date(Number(ts) * 1000))} UTC`;
@@ -796,7 +798,7 @@ function renderLadder() {
       <td class="r">${cents(m.yes)}</td>
       <td class="r">${cents(fair)}</td>
       <td class="r c-cour">${cour == null ? '<span class="muted">-</span>' : pct(cour)}</td>
-      <td>${actionPill(m.report)}</td>
+      <td class="c-ag">${actionPill(m.report)}</td>
       <td class="r c-you">${S.account ? you : '<span class="muted">-</span>'}</td>
     </tr>`;
   }).join('');
@@ -946,7 +948,12 @@ function renderSettled() {
 function renderMine() {
   const rows = [...S.markets.values()].filter((m) => m.pos?.yes > 0 && !m.settled && isBelow(m.kind));
   $('#mine').hidden = !rows.length;
-  $('#mineList').innerHTML = rows.map((m) => `<li><span class="mono">${usd(m.pos.yes)}</span><span>${esc(ifText(m))}</span></li>`).join('');
+  rows.sort((a, b) => a.deadline - b.deadline || b.strike - a.strike);
+  // Compact rows: payout | asset and level | end. More than 3 go behind a toggle so the page stays short.
+  const li = (m) => `<li title="${esc(ifText(m))}"><span class="mono mine-amt">${usd(m.pos.yes)}</span><span class="mine-what">${esc(m.asset)} ≤ ${usd(m.strike)}</span><span class="mine-when muted">${esc(endLabel(m.deadline))}</span></li>`;
+  const total = rows.reduce((t, m) => t + m.pos.yes, 0);
+  $('#mineList').innerHTML = rows.slice(0, 3).map(li).join('')
+    + (rows.length > 3 ? `<li class="mine-more"><details><summary>Show all ${rows.length} (pays up to ${usd(total)} in total)</summary><ul class="mine-list">${rows.slice(3).map(li).join('')}</ul></details></li>` : '');
 }
 
 // ── Multi-path outcomes: from the price now to each open level ──────
@@ -1047,8 +1054,12 @@ function renderLive() {
 
 function renderWallet() {
   const b = $('#connect');
-  b.textContent = S.account ? `${S.balance != null ? `${usd(S.balance)} hUSD-DEMO · ` : ''}${short(S.account)}` : 'Connect wallet';
-  b.title = S.account ? S.account : '';
+  document.body.classList.toggle('wallet-on', !!S.account);
+  if (!S.account) { b.textContent = 'Connect wallet'; b.title = ''; b.removeAttribute('aria-label'); return; }
+  const bal = S.balance != null ? compactUsd(S.balance) : null;
+  b.innerHTML = `${bal ? `<span class="w-bal mono">${esc(bal)}</span>` : ''}<span class="w-addr mono">${esc(short(S.account))}</span>`;
+  b.title = `${S.account}${S.balance != null ? `\n${usd(S.balance)} hUSD-DEMO` : ''}`;
+  b.setAttribute('aria-label', `Wallet ${short(S.account)}${S.balance != null ? `, ${usd(S.balance)} hUSD-DEMO` : ''}`);
 }
 
 function renderFooter() {

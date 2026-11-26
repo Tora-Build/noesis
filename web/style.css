@@ -105,11 +105,15 @@ a:hover { text-decoration-color: currentColor; }
 
 /* Bar */
 .bar { position: sticky; top: 0; z-index: 10; background: rgba(11, 13, 18, .94); backdrop-filter: saturate(1.2) blur(8px); border-bottom: 1px solid #1B1E25; }
-.bar-in { max-width: var(--max); margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 32px; }
-.nav { display: flex; gap: 24px; font-size: 13.5px; color: var(--ink-2); }
+.bar-in { max-width: var(--max); margin: 0 auto; padding: 12px 24px; display: flex; align-items: center; gap: 32px; min-height: 64px; }
+.nav { display: flex; gap: 24px; font-size: 13.5px; color: var(--ink-2); white-space: nowrap; }
 .nav a { text-decoration: none; padding: 4px 0; }
 .nav a:hover { color: var(--ink); }
-.bar-end { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.bar-end { margin-left: auto; display: flex; align-items: center; gap: 12px; flex: none; }
+.net { white-space: nowrap; }
+#connect .w-bal { padding-right: 10px; margin-right: 10px; border-right: 1px solid rgba(11, 13, 18, .25); font-weight: 600; }
+#connect .w-addr { font-weight: 500; }
+#connect { gap: 0; }
 .net { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); padding-right: 4px; }
 .net .mono { font-size: 12px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); display: inline-block; }
@@ -279,7 +283,13 @@ h2 { font-weight: 500; letter-spacing: -.02em; }
 .cta-note { margin: 0; font-size: 12.5px; color: var(--ink-2); }
 .mine { margin-top: 24px; }
 .mine-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14px; }
-.mine-list li { display: flex; gap: 16px; }
+.mine-list li { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.mine-list li.mine-more { display: block; border-bottom: 0; padding: 4px 0 0; }
+.mine-more summary { cursor: pointer; font-size: 13.5px; color: var(--ink-2); padding: 8px 0; }
+.mine-more .mine-list { margin-top: 0; }
+.mine-amt { font-weight: 600; text-align: right; }
+.mine-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mine-when { font-size: 13px; white-space: nowrap; }
 
 .more { margin-top: 16px; }
 .more > summary { cursor: pointer; font-size: 14px; font-weight: 500; color: var(--ink-2); width: max-content; max-width: 100%; padding: 8px 0; }
@@ -430,8 +440,10 @@ dialog::backdrop { background: rgba(11, 13, 18, .55); }
 @media (prefers-reduced-motion: reduce) { .skel, .ghost { animation: none; } html { scroll-behavior: auto; } .seg span { transition: none; } }
 
 /* Responsive */
-@media (max-width: 1060px) {
+@media (max-width: 1240px) {
   .nav { display: none; }
+}
+@media (max-width: 1060px) {
   .duo { grid-template-columns: 1fr; }
 }
 @media (max-width: 980px) {
@@ -446,9 +458,16 @@ dialog::backdrop { background: rgba(11, 13, 18, .55); }
   .foot-in { grid-template-columns: 1fr 1fr; }
   .contracts { justify-content: start; }
 }
+@media (max-width: 760px) {
+  .net #block { display: none; }
+}
 @media (max-width: 560px) {
-  .bar-in { padding: 8px 16px; gap: 8px; }
+  .bar-in { padding: 8px 16px; gap: 8px; min-height: 56px; }
+  .bar-end { gap: 8px; }
+  #faucet { display: none; }
+  #connect .w-bal { padding-right: 8px; margin-right: 8px; }
   .net span:not(.mono), .net .mono { display: none; }
+  .net { padding-right: 0; }
   .word { font-size: 13px; letter-spacing: .28em; margin-right: -.28em; }
   .brand { gap: 8px; }
   .btn { padding: 8px 12px; font-size: 13px; }
@@ -486,7 +505,10 @@ dialog::backdrop { background: rgba(11, 13, 18, .55); }
   .table-scroll { margin: 0 -16px; padding: 0 16px; }
   .grid-t { font-size: 13px; }
   .grid-t th, .grid-t td { padding-left: 6px; padding-right: 6px; }
-  .c-dist, .c-you { display: none; }
+  .c-dist, .c-cour, .c-you { display: none; }
+  body.wallet-on .c-you { display: table-cell; }
+  body.wallet-on .c-ag { display: none; }
+  .mine-list li { grid-template-columns: 72px minmax(0, 1fr) auto; gap: 8px; }
   #faucet { display: none; }
   .faucet-inline { display: block; }
   .how-it { margin-top: 56px; padding-top: 40px; }
@@ -499,4 +521,7 @@ dialog::backdrop { background: rgba(11, 13, 18, .55); }
   .metric dd { font-size: 16px; }
   .foot-in { grid-template-columns: 1fr; padding: 40px 16px; }
   .contracts { grid-template-columns: max-content 1fr; }
+}
+@media (max-width: 400px) {
+  .bar .word { display: none; }
 }
