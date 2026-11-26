@@ -62,6 +62,9 @@ export function readConfig(env = process.env) {
     gasGwei: env.BOT_GAS_GWEI || "0.05",
     cmcTtlSec: num("BOT_CMC_TTL_SEC", 3600),
     cournotResolve: env.BOT_COURNOT_RESOLVE === "1",
+    // Known Cournot markets per market, from the local cache only: "0xMARKET:ID[:invert],…".
+    cournotIds: Object.fromEntries((env.BOT_COURNOT_IDS ?? "").split(",").map((x) => x.trim().split(":")).filter((x) => x.length >= 2 && x[0] && x[1])
+      .map(([mk, id, inv]) => [mk.toLowerCase(), { id, invert: inv === "invert" }])),
     confirmations: num("BOT_LOG_CONFIRMATIONS", 2),
     slippage: num("BOT_SLIPPAGE", 0.02),
   };
@@ -172,7 +175,8 @@ export async function startBot(env = process.env) {
         const snap = await snapshot(m.asset).catch((e) => { log({ job: "agent", market, level: "warn", msg: "CMC failed, model uses the prior", error: errText(e) }); return null; });
         const report = await runMarket({
           client, market, chain, asset: m.asset, snapshot: snap ?? fallbackSnapshot(m.asset),
-          cournotMode: cfg.cournotResolve ? "resolve" : "off", // never the paid probability endpoint
+          // A known id reads the cache. On a cache miss, COURNOT_OFFLINE=1 stops any call, so the bot never spends one.
+          cournotMode: cfg.cournotIds[market.toLowerCase()] ?? (cfg.cournotResolve ? "resolve" : "off"),
           decideOpts: { bankroll: cfg.bankroll }, slippage: cfg.slippage, account: account?.address ?? null,
           wallet, execute: !cfg.dryRun && !!wallet, maxSpendUsd: left, prepare, atlas: atlasRes,
         });
