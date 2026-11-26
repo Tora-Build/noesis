@@ -185,17 +185,7 @@
       </details>
     </section>
 
-    <div class="duo">
-      <section class="panel chances" id="chances" aria-labelledby="chances-h">
-        <div class="panel-head">
-          <h2 id="chances-h" class="panel-h">Chance by level</h2>
-          <p class="muted small" id="chWhen"></p>
-        </div>
-        <p class="ch-key small" aria-hidden="true"><span><i class="k-bar"></i>Market price</span><span><i class="k-mk"></i>Agent estimate</span></p>
-        <ul class="ch-list" id="chList"><li class="empty"><span class="skel skel-w"></span></li></ul>
-        <p class="small muted ch-note">Chances at the deadline from the market and the agent. Not a price forecast.</p>
-      </section>
-
+    <div class="solo">
       <section class="panel ladder" id="strikes" aria-labelledby="ladder-h">
         <div class="panel-head">
           <h2 id="ladder-h" class="panel-h">Levels for <span id="lAsset">-</span> <span id="lSrc"></span></h2>
@@ -241,7 +231,17 @@
       </section>
     </div>
 
-    <div class="pair">
+    <div class="cols">
+      <div class="col">
+      <section class="panel chances" id="chances" aria-labelledby="chances-h">
+        <div class="panel-head">
+          <h2 id="chances-h" class="panel-h">Chance by level</h2>
+          <p class="muted small" id="chWhen"></p>
+        </div>
+        <p class="ch-key small" aria-hidden="true"><span><i class="k-bar"></i>Market price</span><span><i class="k-mk"></i>Agent estimate</span></p>
+        <ul class="ch-list" id="chList"><li class="empty"><span class="skel skel-w"></span></li></ul>
+        <p class="small muted ch-note">Chances at the deadline from the market and the agent. Not a price forecast.</p>
+      </section>
       <section class="panel intel" id="intel" aria-labelledby="intel-h">
         <div class="panel-head">
           <h2 id="intel-h" class="panel-h">Market intelligence</h2>
@@ -249,7 +249,15 @@
         </div>
         <div id="inBody"><p class="empty">No CoinMarketCap data for this level yet.</p></div>
       </section>
-
+      <section class="panel settled" id="settled" aria-labelledby="settled-h">
+        <div class="panel-head">
+          <h2 id="settled-h" class="panel-h">Settled</h2>
+          <p class="muted small">By the feed only.</p>
+        </div>
+        <ul id="setList" class="set-list"><li class="empty">Loading.</li></ul>
+      </section>
+      </div>
+      <div class="col">
       <section class="panel agent" id="agent" aria-labelledby="agent-h">
         <div class="panel-head">
           <h2 id="agent-h" class="panel-h">Risk agent</h2>
@@ -262,9 +270,6 @@
         </div>
         <p class="small muted ag-line">Rule-based agent. It trades on its own with a daily cap. Cournot (AI oracle) is one input when a matching market exists.</p>
       </section>
-    </div>
-
-    <div class="pair">
       <section class="panel oracle" id="oracle" aria-labelledby="oracle-h">
         <div class="panel-head">
           <h2 id="oracle-h" class="panel-h">Oracle</h2>
@@ -272,14 +277,7 @@
         </div>
         <div id="orBody"><p class="empty"><span class="skel skel-w"></span></p></div>
       </section>
-
-      <section class="panel settled" id="settled" aria-labelledby="settled-h">
-        <div class="panel-head">
-          <h2 id="settled-h" class="panel-h">Settled</h2>
-          <p class="muted small">By the feed only.</p>
-        </div>
-        <ul id="setList" class="set-list"><li class="empty">Loading.</li></ul>
-      </section>
+      </div>
     </div>
 
     <section class="how-it" id="how-it-works" aria-labelledby="how-h">
