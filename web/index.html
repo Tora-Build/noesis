@@ -30,7 +30,7 @@
       </nav>
       <div class="bar-end">
         <span class="net" id="net" title="Network and latest block"><i class="dot" aria-hidden="true"></i><span>BNB Chain</span><span class="mono muted" id="block"></span></span>
-        <button class="btn btn-quiet" id="faucet" hidden>Get demo hUSD</button>
+        <button class="btn btn-quiet" id="faucet" hidden>Get hUSD-DEMO</button>
         <button class="btn btn-ink" id="connect">Connect wallet</button>
       </div>
     </div>
@@ -82,7 +82,7 @@
           </div>
         </form>
 
-        <p class="faucet-inline small muted">Need test money? <button class="btn-link" type="button" data-faucet>Get 1,000 demo hUSD</button></p>
+        <p class="faucet-inline small muted">Need test money? <button class="btn-link" type="button" data-faucet>Get 1,000 hUSD-DEMO</button></p>
 
         <div class="mine" id="mine" hidden>
           <h3 class="sub-h">Your protection</h3>
@@ -142,7 +142,7 @@
       <details class="trader" id="trader">
         <summary>Trader view</summary>
         <div class="trader-in">
-          <p class="small muted">Trade YES or NO shares on the selected level. Each share pays 1 hUSD if its side wins.</p>
+          <p class="small muted">Trade YES or NO shares on the selected level. Each share pays 1 hUSD-DEMO if its side wins.</p>
           <div class="trader-row">
             <span class="mono small" id="tMarket">-</span>
           </div>
@@ -204,7 +204,7 @@
         </li>
         <li>
           <span class="step-role">Settler</span>
-          <p>Reads the oracle after the time and proposes the result. A guardian can veto for <span id="vetoMin">a short time</span>. Then anyone finalizes and holders claim.</p>
+          <p>Reads the oracle after the time and proposes the result. Only the feed decides.<span id="vetoNote" hidden> A guardian can veto for <span id="vetoMin">a short time</span>.</span> Then anyone finalizes and holders claim.</p>
           <code>settleFromFeed → settle → settlePosition</code>
         </li>
       </ol>
@@ -213,7 +213,7 @@
 
   <footer class="foot">
     <div class="foot-in">
-      <p><strong>hUSD is demo money with no value.</strong> Anyone can take 1,000 hUSD a day from its faucet.</p>
+      <p><strong>hUSD-DEMO is demo money with no value.</strong> Anyone can take 1,000 hUSD-DEMO a day from its faucet.</p>
       <dl class="contracts" id="contracts"></dl>
     </div>
   </footer>

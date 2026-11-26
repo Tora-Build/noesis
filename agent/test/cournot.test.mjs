@@ -69,13 +69,17 @@ test("probability: request shape, key header, cache hit on the second call", asy
   assert.equal(calls, 1, "second call served from cache");
 });
 
-test("probability: cache expires after the window", async () => {
+test("probability: the cache never expires; --refresh-cournot (force) calls again", async () => {
   let now = 0, calls = 0;
   const cache = tmpCache(() => now);
   const fetchImpl = async () => { calls++; return res(200, fx("cournot-probability.json")); };
   await c.probability(1, "m", { fetchImpl, cache, env: {} });
-  now = 7 * 3600 * 1000;
-  await c.probability(1, "m", { fetchImpl, cache, env: {} });
+  now = 365 * 24 * 3600 * 1000;
+  const again = await c.probability(1, "m", { fetchImpl, cache, env: {} });
+  assert.equal(again.cached, true);
+  assert.equal(calls, 1, "a year later still served from cache");
+  const forced = await c.probability(1, "m", { fetchImpl, cache, env: {}, force: true });
+  assert.equal(forced.cached, false);
   assert.equal(calls, 2);
 });
 
@@ -94,16 +98,32 @@ test("probability: 402 returns needsPayment and never pays", async () => {
   assert.equal(seen.length, 1);
 });
 
-test("probability: rate limit and errors are not cached and not retried", async () => {
+test("probability: failures are cached too, so a rerun never spends another free call", async () => {
+  for (const [status, state] of [[429, "rate_limited"], [500, "service_error"], [400, "api_error"]]) {
+    let calls = 0;
+    const cache = tmpCache(() => 0);
+    const fetchImpl = async () => { calls++; return res(status, { msg: "x" }); };
+    const r = await c.probability(7, "m", { fetchImpl, cache, env: {} });
+    assert.equal(r.state, state);
+    const again = await c.probability(7, "m", { fetchImpl, cache, env: {} });
+    assert.equal(again.cached, true);
+    assert.equal(again.state, state);
+    assert.equal(calls, 1, `${state} not retried`);
+  }
   let calls = 0;
   const cache = tmpCache(() => 0);
-  const r429 = await c.probability(7, "m", { fetchImpl: async () => { calls++; return res(429, {}); }, cache, env: {} });
-  assert.equal(r429.state, "rate_limited");
-  const r500 = await c.probability(7, "m", { fetchImpl: async () => { calls++; return res(500, {}); }, cache, env: {} });
-  assert.equal(r500.state, "service_error");
-  const net = await c.probability(7, "m", { fetchImpl: async () => { calls++; throw new Error("down"); }, cache, env: {} });
+  const net = await c.probability(8, "m", { fetchImpl: async () => { calls++; throw new Error("down"); }, cache, env: {} });
   assert.equal(net.state, "network_error");
-  assert.equal(calls, 3);
+  assert.equal((await c.probability(8, "m", { fetchImpl: async () => { calls++; throw new Error("down"); }, cache, env: {} })).cached, true);
+  assert.equal(calls, 1);
+});
+
+test("probability: an attempt is recorded before the request, so a crash mid-call still blocks a rerun", async () => {
+  const cache = tmpCache(() => 0);
+  let seenDuringCall = null;
+  const fetchImpl = async () => { seenDuringCall = cache.get(11); throw new Error("process killed"); };
+  await c.probability(11, "m", { fetchImpl, cache, env: {} });
+  assert.equal(seenDuringCall.state, "attempted");
 });
 
 test("probability: COURNOT_OFFLINE=1 makes no call", async () => {

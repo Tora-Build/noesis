@@ -92,3 +92,49 @@ test("AMM ABI matches sooth-factory sdk/abi.json", { skip: !existsSync(bundle) &
   const mf = j.contracts.MarketFactory.abi ?? j.contracts.MarketFactory;
   assert.ok(mf.some((f) => f.name === "ammEngine"));
 });
+
+// ── Budget fit and post-impact edge (run.mjs sizing) ─────────────────
+// LMSR-like fake: cost grows faster than linear, price rises with size.
+const fakeQuote = (pricePerShare, impact) => async (shares) => {
+  const n = Number(shares) / 1e18;
+  const net = n * pricePerShare * (1 + impact * n);
+  return { shares, netAmount: BigInt(Math.round(net * 1e6)) * 10n ** 12n, newPrice: pricePerShare + impact * n };
+};
+
+test("fitSharesToBudget bisects shares down until netAmount fits the budget", async () => {
+  const q = fakeQuote(0.4, 0.01);
+  const start = s.sharesForBudget(10, 0.4); // 25 shares; with impact it costs more than $10
+  assert.ok((await q(start)).netAmount > 10n * W);
+  const fit = await s.fitSharesToBudget(q, start, 10n * W);
+  assert.ok(fit.shares > 0n && fit.shares < start);
+  assert.ok(fit.quote.netAmount <= 10n * W, "cost stays inside the budget");
+  assert.ok((await q(fit.shares + 10n ** 16n)).netAmount > 10n * W * 999n / 1000n, "close to the budget, not far below");
+  const cheap = await s.fitSharesToBudget(fakeQuote(0.4, 0), s.sharesForBudget(10, 0.5), 10n * W);
+  assert.equal(cheap.iterations, 1, "no bisect when the first quote fits");
+});
+
+test("postImpactOk: HOLD when the post-trade price crosses fair minus half the threshold", () => {
+  assert.equal(s.postImpactOk({ outcome: 1, newPrice: 0.40, pStar: 0.50, edgeThreshold: 0.05 }), true);
+  assert.equal(s.postImpactOk({ outcome: 1, newPrice: 0.476, pStar: 0.50, edgeThreshold: 0.05 }), false);
+  assert.equal(s.postImpactOk({ outcome: 0, newPrice: 0.60, pStar: 0.50, edgeThreshold: 0.05 }), true);
+  assert.equal(s.postImpactOk({ outcome: 0, newPrice: 0.52, pStar: 0.50, edgeThreshold: 0.05 }), false);
+});
+
+test("planBuy: fits the budget, or holds when no edge is left after impact", async () => {
+  const d = { action: "BUY_YES", outcome: 1, sizeUsd: 10, entryPrice: 0.4, pStar: 0.5, params: { edgeThreshold: 0.05 } };
+  const ok = await s.planBuy(fakeQuote(0.4, 0.001), d);
+  assert.equal(ok.ok, true);
+  assert.ok(ok.quote.netAmount <= 10n * W);
+  const steep = await s.planBuy(fakeQuote(0.4, 0.01), d); // newPrice climbs past 0.475
+  assert.equal(steep.ok, false);
+  assert.match(steep.reason, /No edge is left/);
+});
+
+test("readMarket returns the block number and the raw AMM price for the report proof", async () => {
+  const c = fakeClient();
+  c.getBlock = async () => ({ timestamp: 1_795_680_000n, number: 123n, hash: "0xbb" });
+  const m = await s.readMarket(c, MARKET);
+  assert.equal(m.block, 123);
+  assert.equal(m.blockHash, "0xbb");
+  assert.equal(m.priceWad, (41n * W / 100n).toString());
+});

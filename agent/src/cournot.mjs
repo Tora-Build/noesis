@@ -11,7 +11,9 @@ import { fileURLToPath } from "node:url";
 export const PRODUCTION_BASE = "https://interface.cournot.ai";
 export const DEV_BASE = "https://dev-interface.cournot.ai";
 export const DEFAULT_CACHE_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "cache");
-const DEFAULT_TTL_MS = 6 * 3600 * 1000;
+// No expiry. Each IP has 3 free probability calls in total, so an attempt is never repeated
+// unless the operator asks for it (--refresh-cournot).
+const DEFAULT_TTL_MS = Infinity;
 
 export function cournotBase(env = process.env) {
   const base = (env.COURNOT_API_BASE || PRODUCTION_BASE).replace(/\/$/, "");
@@ -153,7 +155,9 @@ export async function resolve(message, { limit = 5, ...opts } = {}) {
 }
 
 /**
- * Probability for one Cournot market id, at most once per cache window.
+ * Probability for one Cournot market id, at most once ever per id (unless `force`).
+ * Every attempt is cached with no expiry, failures too: a rerun never spends another free call.
+ * A marker is written before the request, so a crash or timeout mid-call also counts as an attempt.
  * Returns { state, probability, basis, ... } or { state:"payment_required", needsPayment:true }.
  * Never retries, never pays.
  */
@@ -165,21 +169,26 @@ export async function probability(marketId, message, { cache = createCache(), fo
     if (hit) return { ...hit, cached: true };
   }
   if (env.COURNOT_OFFLINE === "1") return { state: "offline", probability: null, cached: false };
+  const id = String(marketId);
+  const headers = apiKeyHeader(env);
+  cache.set(marketId, { state: "attempted", probability: null, marketId: id, message, note: "Request started. No answer was stored." });
   let status, body;
   try {
-    ({ status, body } = await post("probability", { message, market_ids: [String(marketId)] }, { ...opts, env, headers: apiKeyHeader(env) }));
+    ({ status, body } = await post("probability", { message, market_ids: [id] }, { ...opts, env, headers }));
   } catch (e) {
-    return { state: "network_error", error: e.message, probability: null, cached: false };
+    const entry = cache.set(marketId, { state: "network_error", error: redact(e.message), probability: null, marketId: id, message });
+    return { ...entry, cached: false };
   }
   const state = responseState(status, body);
   if (state === "complete") {
-    const entry = cache.set(marketId, { state, marketId: String(marketId), message, ...parseProbability(body) });
+    const entry = cache.set(marketId, { state, marketId: id, message, ...parseProbability(body) });
     return { ...entry, cached: false };
   }
   if (state === "payment_required" || state === "pack_exhausted") {
-    // Remember the 402 for the window so we do not hit the endpoint again. No payment is attempted.
-    const entry = cache.set(marketId, { state, needsPayment: true, probability: null, marketId: String(marketId) });
+    // Remember the 402 so we do not hit the endpoint again. No payment is attempted.
+    const entry = cache.set(marketId, { state, needsPayment: true, probability: null, marketId: id, message });
     return { ...entry, cached: false };
   }
-  return { state, httpStatus: status, probability: null, error: redact(body?.msg ?? null), cached: false };
+  const entry = cache.set(marketId, { state, httpStatus: status, probability: null, error: redact(body?.msg ?? null), marketId: id, message });
+  return { ...entry, cached: false };
 }

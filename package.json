@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "web:config": "node scripts/build-web.mjs",
-    "web": "node scripts/build-web.mjs && npx --yes http-server@14.1.1 web -p 8080 -c-1"
+    "web:serve": "npx --yes http-server@14.1.1 web -p 8080 -c-1",
+    "web": "node scripts/build-web.mjs && npm run web:serve",
+    "pages": "node scripts/publish-pages.mjs",
+    "agent:clean": "node -e \"require('node:fs').rmSync('agent/out',{recursive:true,force:true});console.log('agent/out cleared (the Cournot cache in agent/cache is kept)')\""
   },
   "dependencies": {
     "viem": "2.21.0"
