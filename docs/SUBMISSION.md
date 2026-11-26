@@ -1,4 +1,6 @@
-# Sooth Hedge: submission
+# NOESIS: submission
+
+Price the Unknown. Autonomous financial intelligence infrastructure, built on Sooth.
 
 ## Tech stack tags (8)
 
@@ -14,7 +16,7 @@
 ## Links
 
 - Repository: https://github.com/Tora-Build/sooth-hedge
-- Live demo: https://tora-build.github.io/sooth-hedge/
+- Live demo: https://noesis-7fg.pages.dev
 - Video (3 minutes or less): TODO
 
 ## One-page write-up
@@ -23,7 +25,9 @@
 
 People who hold tokenized stocks on BNB Chain (for example IWMB) have no simple way to protect against a price drop. Options desks are not on-chain, and insurance cover needs a claims vote.
 
-Sooth Hedge sells protection as a market: "You pay $X. You get $Y if IWMB is below $260 on Dec 1." Atlas Oracle settles it on-chain. No person decides the result. A risk agent prices every strike from CoinMarketCap data and Cournot evidence, and trades when the market price is wrong.
+NOESIS sells protection as a market: "You pay $X. You get $Y if IWMB is below $260 on Dec 1." Atlas Oracle settles it on-chain. No person decides the result. A risk agent prices every strike from CoinMarketCap data and Cournot evidence, and trades when the market price is wrong.
+
+On the page you drag a floor line on the live Atlas price chart. One level pays a fixed amount below the floor. Staircase spreads the cover over several levels, so the payout grows as the price falls, like a put. A multi-path view shows each level with its market chance and the agent's fair price. With a wallet connected, the page reads your real IWMB, EWZB and BNB balances.
 
 Audience: holders of tokenized stocks and BNB who want downside protection, and traders and agents who want to sell it.
 
@@ -59,8 +63,15 @@ Usage can be checked two ways: the CMC API logs on our key, and the on-chain rea
 | BNB below $530 at 2026-12-01 21:00 UTC (Chainlink) | [`0xac3142571C30E8BB79633D1E00061598577B292B`](https://bscscan.com/address/0xac3142571C30E8BB79633D1E00061598577B292B) |
 | IWMB below $268 at 2026-11-26 18:00 UTC (Atlas Oracle) | [`0xBBFDd23ED7a16FE31Ee8eCb54bF1f0EcdB9aea4f`](https://bscscan.com/address/0xBBFDd23ED7a16FE31Ee8eCb54bF1f0EcdB9aea4f) |
 | IWMB below $268 at 2026-11-27 08:10 UTC (Atlas Oracle) | [`0x76DB6d06D715d8191A4703a3391342fC59Fb17e9`](https://bscscan.com/address/0x76DB6d06D715d8191A4703a3391342fC59Fb17e9) |
+| EWZB below $30.6 at 2026-12-01 21:00 UTC (Atlas Oracle) | [`0x8B51Fb36E83ca23C7EfbD316E87648D85BD45cd0`](https://bscscan.com/address/0x8B51Fb36E83ca23C7EfbD316E87648D85BD45cd0) |
+| EWZB below $30.4 at 2026-12-01 21:00 UTC (Atlas Oracle) | [`0x22c7803f59803EB0B0771A715DEF5E00fF30687C`](https://bscscan.com/address/0x22c7803f59803EB0B0771A715DEF5E00fF30687C) |
+| EWZB below $29.8 at 2026-12-01 21:00 UTC (Atlas Oracle) | [`0xCb7418F01429E7Fbf11bEC081737d32AFfC1cCFc`](https://bscscan.com/address/0xCb7418F01429E7Fbf11bEC081737d32AFfC1cCFc) |
+| BNB below $465.00 at 2026-11-27 22:00 UTC (Chainlink) | [`0x4fB5166B9038756e88F522dbCce8F0A69bbBf146`](https://bscscan.com/address/0x4fB5166B9038756e88F522dbCce8F0A69bbBf146) |
+| BNB below $450.00 at 2026-11-27 22:00 UTC (Chainlink) | [`0x2aF678988d67d03741B46a9E40B56Be4caAbE4e7`](https://bscscan.com/address/0x2aF678988d67d03741B46a9E40B56Be4caAbE4e7) |
 
-Agent trade on mainnet (BUY NO on the $262 level, CMC-priced): [`0x43404133…3197`](https://bscscan.com/tx/0x43404133605c50e799b9ba1683c0c605a5114dbc1cc0d88ee2e8de8952fd3197).
+Agent trades on mainnet (CMC-priced): BUY NO on IWMB $262 [`0x43404133…3197`](https://bscscan.com/tx/0x43404133605c50e799b9ba1683c0c605a5114dbc1cc0d88ee2e8de8952fd3197), BUY YES on EWZB $30.40 [`0xcd64e62d…`](https://bscscan.com/tx/0xcd64e62dd3398972d0cce2f0260692e4dab4f784135307eab17570672c1fb9cc) and EWZB $29.80 [`0xe188f0c1…`](https://bscscan.com/tx/0xe188f0c194cbf658ea11d276bcc641bdca49342f8a4a0c506fb890db50821f12).
+
+Cournot: the two BNB markets at 2026-11-27 22:00 UTC state the opposite claim of Cournot markets 113137 and 113109. The agent uses 1 - p from Cournot (1% and 10%) with its evidence.
 
 The adjudicator has no guardian and a veto period of 0: only the feed decides.
 

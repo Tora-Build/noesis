@@ -1,4 +1,8 @@
-# Sooth Hedge
+# NOESIS
+
+Price the Unknown. Live demo: https://noesis-7fg.pages.dev
+
+NOESIS is built on Sooth. The code and contracts below use the working name Sooth Hedge.
 
 Risk markets for agents on BNB Chain.
 
