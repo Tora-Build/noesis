@@ -2,7 +2,7 @@
 // the risk agent's reports (reports/<market>.json). If a value is missing, the page says so.
 import {
   createPublicClient, createWalletClient, custom, http, parseAbi, parseAbiItem, formatUnits, parseUnits, defineChain, toHex,
-} from 'https://esm.sh/viem@2.21.0';
+} from './vendor/viem.js';
 
 const ADJ = parseAbi([
   'function terms(address) view returns ((uint8 source, address feed, bytes4 feedId, uint8 kind, uint256 strikeWad, uint64 maxDelay))',
@@ -158,6 +158,9 @@ const REPORT_TTL = 300_000; // reports change every 30 min; look again every 5 m
 
 async function readMarket(c) {
   const a = c.market;
+  const prev0 = S.markets.get(a);
+  const needReport = prev0?.report === undefined || Date.now() - (prev0?.reportAt ?? 0) > REPORT_TTL;
+  const reportP = needReport ? fetchReport(a, prev0?.report !== undefined) : null;
   const [t, feed, st, amm, deadline, settled, open, opened] = await Promise.all([
     pub.readContract({ address: cfg.adjudicator, abi: ADJ, functionName: 'terms', args: [a] }),
     pub.readContract({ address: cfg.adjudicator, abi: ADJ, functionName: 'readFeed', args: [a] }).catch(() => null),
@@ -180,8 +183,8 @@ async function readMarket(c) {
     yes: amm ? wad(amm[2]) : null, qYes: amm?.[0], qNo: amm?.[1],
     report: prev?.report, reportAt: prev?.reportAt, pos: prev?.pos, observed: prev?.observed,
   };
-  if (m.report === undefined || Date.now() - (m.reportAt ?? 0) > REPORT_TTL) {
-    const r = await fetchReport(a, m.report !== undefined);
+  if (reportP) {
+    const r = await reportP;
     if (r || m.report === undefined) m.report = r;
     m.reportAt = Date.now();
   }
@@ -627,7 +630,7 @@ function drawChart() {
     CH = null;
     svg.innerHTML = '<title id="svgTitle">Price chart with a protection level line</title>';
     msg.hidden = false;
-    msg.innerHTML = !S.markets.size ? '<span class="skel skel-w"></span>' : !ap ? 'No feed price for this asset.' : 'No open levels for this end time. Pick another one.';
+    msg.innerHTML = !S.markets.size ? '<span><span class="spin" aria-hidden="true"></span> Loading live markets from BNB Chain…</span>' : !ap ? 'No feed price for this asset.' : 'No open levels for this end time. Pick another one.';
     $('#chartCap').textContent = '';
     return;
   }
@@ -638,7 +641,7 @@ function drawChart() {
   const t1 = Math.max(S.now, ap.ts), t0 = t1 - HIST_SEC;
   pts = pts.filter(([t]) => t >= t0);
   const hasHist = h.state === 'ok' && pts.length >= 2;
-  $('#chartCap').textContent = h.state === 'loading' ? 'Loading 6 h of feed prices.' : hasHist ? `Last 6 h, ${pts.length} feed prices, UTC.` : 'No feed history found. The chart shows the price now.';
+  $('#chartCap').innerHTML = h.state === 'loading' ? '<span class="spin" aria-hidden="true"></span> Loading 6 h of feed prices…' : hasHist ? `Last 6 h, ${pts.length} feed prices, UTC.` : 'No feed history found. The chart shows the price now.';
 
   // Layout: price plot | level labels | payout profile.
   const narrow = W < 480;
@@ -1231,6 +1234,7 @@ function toast(html, ms = 6000) {
 }
 
 function fatal(msg) {
+  document.getElementById('loadBar')?.setAttribute('hidden', '');
   document.querySelector('main').insertAdjacentHTML('afterbegin', `<p class="form-msg err" role="alert" style="margin-top:24px">${esc(msg)}</p>`);
 }
 
@@ -1570,11 +1574,14 @@ let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTime
 async function refresh() {
   if (dialogOpen() || drag) return; // paused while the confirm dialog is open or the line moves
   try {
-    await refreshChain();
-    await loadMarkets();
-    await Promise.all([...S.markets.values()].filter((m) => m.phase >= PH.RESOLVED).map((m) => loadObserved(m).catch(() => {})));
+    await Promise.all([refreshChain(), loadMarkets()]);
+    setLoading(false);
     if (!drag && !dialogOpen()) renderAll();
+    // Settlement logs are slow on public RPCs: read them after the first render.
+    const need = [...S.markets.values()].filter((m) => m.phase >= PH.RESOLVED && !m.observed);
+    if (need.length) Promise.all(need.map((m) => loadObserved(m).catch(() => {}))).then(() => { if (!drag && !dialogOpen()) renderAll(); });
   } catch (e) {
+    setLoading(false);
     $('#net .dot').className = 'dot err';
     $('#block').textContent = 'RPC error';
     if (!S.markets.size) $('#heroLive').textContent = 'Cannot reach BNB Chain right now. The page tries again in 30 s.';
@@ -1586,6 +1593,12 @@ async function refresh() {
   }
 }
 
+// Loading state: a bar at the top and a line in the chart until the first chain read is done.
+function setLoading(on) {
+  document.body.classList.toggle('loading', on);
+  $('#loadBar')?.toggleAttribute('hidden', !on);
+}
+setLoading(true);
 renderFooter();
 pub.readContract({ address: cfg.adjudicator, abi: ADJ, functionName: 'vetoPeriod' })
   .then((v) => { S.vetoPeriod = Number(v); $('#vetoMin').textContent = span(Number(v)); $('#vetoNote').hidden = !(S.vetoPeriod > 0); }).catch(() => {});

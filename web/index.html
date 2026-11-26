@@ -12,8 +12,10 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/svg+xml" href="mark.svg">
+  <link rel="modulepreload" href="vendor/viem.js">
 </head>
 <body>
+  <div class="load-bar" id="loadBar" role="progressbar" aria-label="Loading live data from BNB Chain"><i></i></div>
   <a class="skip" href="#protect">Skip to protection</a>
 
   <header class="bar on-dark">
@@ -84,7 +86,7 @@
         <a class="btn btn-amber btn-lg" href="#protect">Create protection <span aria-hidden="true">→</span></a>
         <a class="btn btn-line btn-lg" href="#how-it-works">How it works</a>
       </div>
-      <p class="cover-live" id="heroLive"><span class="skel" aria-hidden="true"></span></p>
+      <p class="cover-live" id="heroLive" aria-live="polite"><span class="spin" aria-hidden="true"></span> Loading live markets from BNB Chain…</p>
     </div>
   </section>
 
