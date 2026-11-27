@@ -22,17 +22,19 @@
         <svg class="mark" viewBox="31.5 0.5 97 97" width="28" height="28" aria-hidden="true" focusable="false"><circle cx="80" cy="49" r="48.5" fill="#F9F4E3"/><circle cx="80" cy="49" r="39" fill="#FFD200" stroke="#0B0D12" stroke-width="7"/><path d="M47 68 A39 39 0 0 1 106 20 Z" fill="#F9F4E3"/><ellipse cx="80" cy="49" rx="43" ry="14" transform="rotate(-47 80 49)" fill="#F9F4E3" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="39" fill="none" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="5" fill="#0B0D12"/></svg>
         <span class="word">NOESIS</span>
       </a>
-      <nav class="nav" aria-label="Pages">
+      <nav class="nav" aria-label="Main">
         <a href="./#assets">Markets</a>
         <a href="./#protect">Protect</a>
         <a href="./#settle">How it settles</a>
         <a href="intel.html" aria-current="page">Oracle</a>
       </nav>
       <div class="bar-end">
-        <span class="net" title="Network and latest block"><i class="dot" aria-hidden="true"></i><span>BNB Chain</span><span class="mono muted" id="block"></span></span>
-        <a class="btn btn-amber" href="./#protect">Protect a position</a>
+        <span class="net" id="net" title="Network and latest block"><i class="dot" aria-hidden="true"></i><span>BNB Chain</span><span class="mono muted" id="block"></span></span>
+        <button class="btn btn-line" id="faucet" hidden title="Get 1,000 hUSD-DEMO (demo money, no value)" aria-label="Faucet: get 1,000 hUSD-DEMO">Faucet</button>
+        <button class="btn btn-amber" id="connect">Connect wallet</button>
       </div>
     </div>
+    <p class="demo-strip">Live on BNB Chain mainnet. You pay in <b>hUSD-DEMO</b>, demo money with no value.</p>
   </header>
 
   <section class="ix-hero on-dark" aria-labelledby="ix-h">
@@ -80,6 +82,7 @@
       <p class="built"><a href="./">Back to NOESIS</a> · Built on Sooth.</p>
     </div>
   </footer>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <script type="module" src="intel.js"></script>
 </body>
 </html>

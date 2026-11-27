@@ -1146,31 +1146,49 @@ function renderSettled() {
   }).join('');
 }
 
-// Status of a position, from data the page already has: phase, outcome, settled flag, shares.
-function coverStatus(m) {
+// Status of one side of a position (side 1 = YES, 0 = NO), from data the page already has.
+function posStatus(m, side) {
   if (live(m)) return ['', 'Open'];
   if (!m.settled) {
     // The feed result is in but not final yet.
-    if ((m.phase === PH.RESOLVED || m.phase === PH.ATTESTED) && m.outcome < 2) return m.outcome === 1 ? ['won', 'Won'] : ['lost', 'Lost'];
+    if ((m.phase === PH.RESOLVED || m.phase === PH.ATTESTED) && m.outcome < 2) return m.outcome === side ? ['won', 'Won'] : ['lost', 'Lost'];
     return ['wait', 'Waiting'];
   }
-  if (m.outcome === 1 || m.outcome === 2) return ['claim', 'Claim'];
+  if (m.outcome === side || m.outcome === 2) return ['claim', 'Claim'];
   return ['lost', 'Lost'];
 }
+// What one claim pays: settlePosition pays every side the wallet holds in that market.
+const claimPay = (m) => (m.outcome === 1 ? m.pos.yes : m.outcome === 0 ? m.pos.no : (m.pos.yes + m.pos.no) / 2);
+
+// Your positions: YES and NO, open and settled. One row per side held.
 function renderMine() {
-  const rows = [...S.markets.values()].filter((m) => m.pos?.yes > 0 && isBelow(m.kind));
+  const rows = [];
+  for (const m of S.markets.values()) {
+    if (m.pos?.yes > 0) rows.push({ m, side: 1, n: m.pos.yes });
+    if (m.pos?.no > 0) rows.push({ m, side: 0, n: m.pos.no });
+  }
   $('#mine').hidden = !rows.length;
-  rows.sort((a, b) => a.deadline - b.deadline || b.strike - a.strike);
-  // Compact rows: payout | asset and level | end | status. More than 3 go behind a toggle.
-  const li = (m) => {
-    const [cls, label] = coverStatus(m);
-    const pay = m.outcome === 2 ? m.pos.yes / 2 : m.pos.yes;
-    const act = cls === 'claim' ? `<button class="btn btn-ink btn-sm" data-act="claim" data-m="${esc(m.addr)}">Claim ${esc(usd(pay))}</button>` : `<span class="status ${cls === 'won' ? 'done' : cls === 'lost' ? '' : cls}">${esc(label)}</span>`;
-    return `<li title="${esc(ifText(m))}"><span class="mono mine-amt">${usd(m.pos.yes)}</span><span class="mine-what">${esc(m.asset)} ≤ ${usd(m.strike)}</span><span class="mine-when muted">${esc(endLabel(m.deadline))}</span><span class="mine-st">${act}</span></li>`;
+  // Open first (nearest deadline first), then finished (newest first).
+  rows.sort((a, b) => (live(b.m) - live(a.m)) || (live(a.m) ? a.m.deadline - b.m.deadline : b.m.deadline - a.m.deadline) || b.m.strike - a.m.strike || b.side - a.side);
+  // Payout | side, asset and level | end | status or claim. One claim button per market.
+  const claimed = new Set();
+  const li = ({ m, side, n }) => {
+    const [cls, label] = posStatus(m, side);
+    let act;
+    if (cls === 'claim' && !claimed.has(m.addr)) {
+      claimed.add(m.addr);
+      act = `<button class="btn btn-ink btn-sm" data-act="claim" data-m="${esc(m.addr)}">Claim ${esc(usd(claimPay(m)))}</button>`;
+    } else if (cls === 'claim') act = '<span class="status done">In claim above</span>';
+    else act = `<span class="status ${cls === 'won' ? 'done' : cls === 'lost' ? '' : cls}">${esc(label)}</span>`;
+    // YES pays at or past the level; NO pays when the price stays on the other side.
+    const op = side ? (isBelow(m.kind) ? '≤' : '≥') : (isBelow(m.kind) ? '>' : '<');
+    const how = side ? `pays if ${m.asset} ends at or ${isBelow(m.kind) ? 'below' : 'above'}` : `pays if ${m.asset} ends ${isBelow(m.kind) ? 'above' : 'below'}`;
+    return `<li title="${esc(ifText(m))}"><span class="mono mine-amt">${usd(n)}</span><span class="mine-what"><span class="mine-line"><b class="side-tag side-${side ? 'yes' : 'no'}">${side ? 'YES' : 'NO'}</b> <span aria-hidden="true">${esc(`${m.asset} ${op} ${usd(m.strike)}`)}</span><span class="sr">${esc(`${how} ${usd(m.strike)}`)}</span></span><span class="mine-when muted">${esc(endLabel(m.deadline))}</span></span><span class="mine-st">${act}</span></li>`;
   };
-  const total = rows.reduce((t, m) => t + m.pos.yes, 0);
-  $('#mineList').innerHTML = rows.slice(0, 3).map(li).join('')
-    + (rows.length > 3 ? `<li class="mine-more"><details><summary>Show all ${rows.length} (pays up to ${usd(total)} in total)</summary><ul class="mine-list">${rows.slice(3).map(li).join('')}</ul></details></li>` : '');
+  const open = rows.filter((r) => live(r.m)).reduce((t, r) => t + r.n, 0);
+  const html = rows.map(li);
+  $('#mineList').innerHTML = html.slice(0, 4).join('')
+    + (rows.length > 4 ? `<li class="mine-more"><details><summary>Show all ${rows.length}${open ? ` (open positions pay up to ${usd(open)})` : ''}</summary><ul class="mine-list">${html.slice(4).join('')}</ul></details></li>` : '');
 }
 
 // ── Chance by level: market price and agent estimate per level ──────
@@ -1655,6 +1673,15 @@ if (!cfg.markets?.length) { const msg = $('#plotMsg'); msg.hidden = false; msg.t
 drawChart();
 await refresh();
 setInterval(refresh, 30_000);
+
+// Keep the wallet across pages: if the wallet already allowed this site, show it again with no prompt.
+if (window.ethereum && !S.account) {
+  window.ethereum.request({ method: 'eth_accounts' }).then(async (a) => {
+    if (!a?.[0] || S.account) return;
+    S.wallet = walletClient(); S.account = a[0];
+    renderWallet(); await loadPositions(); renderAll(); renderWallet();
+  }).catch(() => {});
+}
 
 // The hero dot moves along its orbit. Stop it for people who ask for less motion.
 {

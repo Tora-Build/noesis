@@ -1,7 +1,7 @@
 // NOESIS Oracle intelligence page. Live feed prices from BNB Chain, the Atlas Consensus Score
 // from the risk agent's reports (the agent reads the signed Atlas API every 30 min), and what
 // the agent may do with each feed. If a value is missing, the page says so.
-import { createPublicClient, http, parseAbi, formatUnits, defineChain } from './vendor/viem.js';
+import { createPublicClient, createWalletClient, custom, http, parseAbi, formatUnits, defineChain } from './vendor/viem.js';
 
 const ADJ = parseAbi([
   'function readFeed(address) view returns (uint256 priceWad, uint64 ts)',
@@ -209,6 +209,7 @@ function feedTab(f) {
 
 function render() {
   $('#block').textContent = S.block != null ? `#${S.block.toLocaleString('en-US')}` : '';
+  $('#net .dot').className = S.block != null ? 'dot live' : 'dot err';
   if (!S.feeds.some((f) => f.asset === S.tab)) S.tab = S.feeds[0]?.asset ?? null;
   const tabs = $('#feedTabs'), had = tabs.contains(document.activeElement);
   tabs.innerHTML = S.feeds.map(feedTab).join('');
@@ -248,5 +249,85 @@ async function tick(first = false) {
     if (first) $('#feedGrid').innerHTML = '<p class="empty">No live data yet. The page tries again in 30 s.</p>';
   }
 }
-await tick(true);
+tick(true); // the wallet below does not wait for the first read
 setInterval(() => { if (!document.hidden) tick(); }, 30_000);
+
+
+// ── Header wallet: the same as on the main page (connect, hUSD-DEMO balance, faucet). ──
+const ERC20 = parseAbi(['function balanceOf(address) view returns (uint256)', 'function faucet()', 'function lastFaucet(address) view returns (uint256)']);
+const W = { wallet: null, account: null, balance: null };
+const compactUsd = (n) => (Math.abs(n) >= 1e6 ? `$${(Math.floor(n / 1e5) / 10).toFixed(1)}M` : Math.abs(n) >= 1e4 ? `$${(Math.floor(n / 1e2) / 10).toFixed(1)}k` : usd(n, 0));
+let toastTimer;
+function toast(html, ms = 6000) {
+  const t = $('#toast');
+  t.innerHTML = html; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms);
+}
+function walletError(e) {
+  const m = `${e?.shortMessage ?? ''} ${e?.message ?? ''}`;
+  if (/User (rejected|denied)|rejected the request|4001/i.test(m)) return 'You cancelled in your wallet.';
+  if (/ONCE_A_DAY/.test(m)) return 'This wallet already got hUSD-DEMO in the last 24 hours. The faucet gives 1,000 once a day per wallet.';
+  return (e?.shortMessage ?? e?.message ?? 'Something went wrong.').split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 2).join(' ');
+}
+function renderWallet() {
+  const b = $('#connect');
+  document.body.classList.toggle('wallet-on', !!W.account);
+  if (!W.account) { b.textContent = 'Connect wallet'; b.title = ''; b.removeAttribute('aria-label'); return; }
+  const bal = W.balance != null ? compactUsd(W.balance) : null;
+  b.innerHTML = `${bal ? `<span class="w-bal mono">${esc(bal)}</span>` : ''}<span class="w-addr mono">${esc(short(W.account))}</span>`;
+  b.title = `${W.account}${W.balance != null ? `\n${usd(W.balance)} hUSD-DEMO` : ''}`;
+  b.setAttribute('aria-label', `Wallet ${short(W.account)}${W.balance != null ? `, ${usd(W.balance)} hUSD-DEMO` : ''}`);
+}
+async function readBalance() {
+  if (!W.account || !cfg.stable) return;
+  try { W.balance = wad(await pub.readContract({ address: cfg.stable, abi: ERC20, functionName: 'balanceOf', args: [W.account] })); } catch { /* keep the last value */ }
+  renderWallet();
+}
+// Never send on the wrong chain: ask to switch, add the chain if needed, then check again.
+async function ensureChain() {
+  if ((await W.wallet.getChainId()) === chain.id) return;
+  try { await W.wallet.switchChain({ id: chain.id }); }
+  catch (e) {
+    if (/rejected|denied|4001/i.test(`${e?.message} ${e?.code}`)) throw new Error(`Switch your wallet to ${chain.name} to continue.`);
+    await W.wallet.addChain({ chain });
+  }
+  if ((await W.wallet.getChainId()) !== chain.id) throw new Error(`Your wallet is not on ${chain.name}. Switch it and try again.`);
+}
+async function connectWallet() {
+  if (!window.ethereum) throw new Error('No wallet found. Install a browser wallet to trade. You can still read every market.');
+  try {
+    W.wallet = createWalletClient({ chain, transport: custom(window.ethereum) });
+    [W.account] = await W.wallet.requestAddresses();
+    if (!W.account) throw new Error('The wallet gave no account.');
+    await ensureChain();
+  } catch (e) { W.wallet = null; W.account = null; W.balance = null; renderWallet(); throw e; }
+  renderWallet();
+  await readBalance();
+}
+$('#connect').onclick = () => connectWallet().catch((e) => toast(esc(walletError(e))));
+$('#faucet').hidden = !cfg.faucet;
+$('#faucet').onclick = async (ev) => {
+  const b = ev.currentTarget; b.disabled = true;
+  try {
+    if (!W.account) await connectWallet();
+    else await ensureChain();
+    // Once a day per wallet: check first, so no transaction fails.
+    const last = Number(await pub.readContract({ address: cfg.stable, abi: ERC20, functionName: 'lastFaucet', args: [W.account] }));
+    if (last && Date.now() / 1000 < last + 86400) { toast(`This wallet already got hUSD-DEMO today. Next faucet: ${esc(when(last + 86400))}.`); return; }
+    const { request } = await pub.simulateContract({ address: cfg.stable, abi: ERC20, functionName: 'faucet', args: [], account: W.account });
+    const hash = await W.wallet.writeContract(request);
+    const rc = await pub.waitForTransactionReceipt({ hash });
+    if (rc.status !== 'success') throw new Error('The transaction failed.');
+    toast(`1,000 hUSD-DEMO sent. ${link(`${EXPLORER}/tx/${hash}`, 'View tx')}`);
+    await readBalance();
+  } catch (e) { toast(esc(walletError(e))); }
+  finally { b.disabled = false; }
+};
+window.ethereum?.on?.('accountsChanged', (a) => { W.account = a?.[0] ?? null; W.balance = null; if (W.account) W.wallet ??= createWalletClient({ chain, transport: custom(window.ethereum) }); renderWallet(); readBalance(); });
+window.ethereum?.on?.('chainChanged', () => location.reload());
+// Keep the wallet across pages: if the wallet already allowed this site, show it again with no prompt.
+window.ethereum?.request({ method: 'eth_accounts' }).then((a) => {
+  if (!a?.[0] || W.account) return;
+  W.wallet = createWalletClient({ chain, transport: custom(window.ethereum) }); W.account = a[0];
+  renderWallet(); readBalance();
+}).catch(() => {});
