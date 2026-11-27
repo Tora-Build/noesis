@@ -23,24 +23,23 @@
         <span class="word">NOESIS</span>
       </a>
       <nav class="nav" aria-label="Pages">
+        <a href="./#assets">Markets</a>
         <a href="./#protect">Protect</a>
-        <a href="./#strikes">Levels</a>
-        <a href="./#agent">Risk agent</a>
-        <a href="intel.html" aria-current="page">Oracle intelligence</a>
-        <a href="./#how-it-works">How it works</a>
+        <a href="./#settle">How it settles</a>
+        <a href="intel.html" aria-current="page">Oracle</a>
       </nav>
       <div class="bar-end">
         <span class="net" title="Network and latest block"><i class="dot" aria-hidden="true"></i><span>BNB Chain</span><span class="mono muted" id="block"></span></span>
-        <a class="btn btn-amber" href="./#protect">Create protection</a>
+        <a class="btn btn-amber" href="./#protect">Protect a position</a>
       </div>
     </div>
   </header>
 
   <section class="ix-hero on-dark" aria-labelledby="ix-h">
     <div class="ix-hero-in">
-      <p class="eyebrow">Oracle intelligence</p>
+      <p class="eyebrow">Oracle data</p>
       <h1 id="ix-h">The data behind every decision.</h1>
-      <p class="ix-lede">Live Atlas data feeds, their Consensus Score and health, and what the risk agent may do with each one. The agent does not trade on data it cannot trust.</p>
+      <p class="ix-lede">Each feed, its Consensus Score, and what the agent may do with it. The agent does not trade on data it cannot trust.</p>
       <dl class="ix-kpis" id="kpis">
         <div><dt>Live feeds</dt><dd id="kFeeds"><span class="skel"></span></dd></div>
         <div><dt>Agent mode now</dt><dd id="kMode"><span class="skel"></span></dd></div>
@@ -56,11 +55,12 @@
         <h2 id="feeds-h">Data feeds</h2>
         <p class="muted small" id="fWhen" aria-live="polite">Loading live prices from BNB Chain…</p>
       </div>
-      <div class="ix-grid" id="feedGrid">
-        <article class="ix-card ix-ghost"><span class="skel skel-w"></span></article>
-        <article class="ix-card ix-ghost"><span class="skel skel-w"></span></article>
-        <article class="ix-card ix-ghost"><span class="skel skel-w"></span></article>
+      <div class="ix-tabs asset-grid" id="feedTabs" role="tablist" aria-label="Data feeds">
+        <div class="acard skel-card"><span class="skel skel-w"></span></div>
+        <div class="acard skel-card"><span class="skel skel-w"></span></div>
+        <div class="acard skel-card"><span class="skel skel-w"></span></div>
       </div>
+      <div class="ix-detail" id="feedGrid" role="tabpanel" tabindex="0" aria-live="polite"></div>
     </section>
 
     <section class="ix-rules" aria-labelledby="rules-h">
@@ -72,25 +72,6 @@
       <p class="small muted">Code: <a href="https://github.com/Tora-Build/noesis/blob/main/agent/src/atlas.mjs" target="_blank" rel="noopener noreferrer"><code>atlasGate()</code> in agent/src/atlas.mjs</a>. Atlas signs the price payload. The score comes in the same API response but is not in the signed payload.</p>
     </section>
 
-    <section aria-labelledby="mk-h">
-      <div class="ix-head">
-        <h2 id="mk-h">Protection markets</h2>
-        <p class="muted small">Every open market, with the Consensus Score the agent saw at its last check.</p>
-      </div>
-      <div class="table-scroll ix-table" tabindex="0" role="region" aria-label="Protection markets table">
-        <table class="grid-t" id="mkT">
-          <thead><tr>
-            <th scope="col">Market</th>
-            <th scope="col">Ends</th>
-            <th scope="col" class="r">Market chance</th>
-            <th scope="col" class="r">Agent estimate</th>
-            <th scope="col">Consensus</th>
-            <th scope="col">Agent</th>
-          </tr></thead>
-          <tbody><tr><td colspan="6" class="empty"><span class="skel skel-w"></span></td></tr></tbody>
-        </table>
-      </div>
-    </section>
   </main>
 
   <footer class="foot on-dark">
