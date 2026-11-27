@@ -104,6 +104,21 @@ export async function buildWeb(o) {
       });
     }
   }
+  // Public log RPCs can return too few events. The bot keeps every market it found or made in
+  // its state file, so add those too. A market must never drop off the page.
+  const knownFile = o.stateFile && existsSync(o.stateFile) ? o.stateFile : null;
+  if (knownFile) {
+    const have = new Set(markets.map((m) => m.market.toLowerCase()));
+    const known = JSON.parse(readFileSync(knownFile, 'utf8')).markets ?? {};
+    for (const [market, m] of Object.entries(known)) {
+      if (have.has(market.toLowerCase())) continue;
+      markets.push({
+        market, question: m.question, deadline: Number(m.deadline), asset: m.asset ?? null, source: Number(m.source),
+        feed: m.feed, feedId: m.feedId, kind: Number(m.kind), strike: String(m.strikeWad), maxDelay: Number(m.maxDelay), block: Number(m.block),
+      });
+    }
+    markets.sort((a, b) => a.block - b.block);
+  }
   const config = {
     chainId: d.chainId, chainName: 'BNB Smart Chain', rpc: pageRpc,
     explorer: 'https://bscscan.com', adjudicator: d.adjudicator, amm: d.amm,

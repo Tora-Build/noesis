@@ -290,7 +290,7 @@ export async function startBot(env = process.env) {
   // ── Publish ──
   async function publishJob() {
     const { publishPages } = await import("../scripts/publish-pages.mjs");
-    const r = await publishPages({ target: "cloudflare", project: cfg.pagesProject, rpc: cfg.rpc, logRpc: cfg.logRpc, deployment: cfg.deploymentFile, reports: OUT_DIR });
+    const r = await publishPages({ target: "cloudflare", project: cfg.pagesProject, rpc: cfg.rpc, logRpc: cfg.logRpc, deployment: cfg.deploymentFile, reports: OUT_DIR, stateFile: cfg.stateFile });
     log({ job: "publish", action: "PUBLISHED", markets: r.markets, reports: r.reports, url: r.pushed?.url ?? null });
   }
 
