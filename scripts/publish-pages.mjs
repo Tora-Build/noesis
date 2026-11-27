@@ -31,14 +31,14 @@ const git = (args, cwd) => {
 
 /** Build the static site into a new temp dir. Returns { dir, markets, reports, skipped }. */
 export async function buildSite({ rpc, logRpc, pageRpc = DEFAULT_PAGE_RPC, deployment = join(ROOT, 'contracts/deployments/56.json'),
-  reports, maxTrade = '500', slippage = '200' } = {}) {
+  reports, stateFile, maxTrade = '500', slippage = '200' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'sooth-hedge-pages-'));
   // Static files: everything in web/ except the generated config.json and reports/.
   for (const f of readdirSync(join(ROOT, 'web'))) {
     if (f === 'config.json' || f === 'reports' || f.startsWith('.')) continue;
     cpSync(join(ROOT, 'web', f), join(dir, f), { recursive: true });
   }
-  const r = await buildWeb({ deployment, rpc, logRpc, pageRpc, out: dir, mainnetOnly: true, reports, maxTrade, slippage });
+  const r = await buildWeb({ deployment, rpc, logRpc, pageRpc, out: dir, mainnetOnly: true, reports, stateFile, maxTrade, slippage });
   writeFileSync(join(dir, '.nojekyll'), ''); // serve files as they are
   return { dir, markets: r.markets, reports: r.reports, skipped: r.skipped };
 }
