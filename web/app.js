@@ -408,6 +408,7 @@ function renderAll() {
   renderChances();
   syncLevelInput();
   renderPortfolio();
+  renderFeeds();
   renderLive();
 }
 
@@ -1001,6 +1002,63 @@ function renderOracle() {
     <p class="or-rule">At the deadline, anyone can call settle; the contract reads this feed; the price must be at most ${esc(String(m.maxDelay))} s old; no person can change the result.</p>
     <p class="small">${link(IMPL_ADJ, 'Implementation')} · ${link(addrUrl(cfg.adjudicator), 'Adjudicator contract')}</p>`;
 }
+
+// ── Oracle intelligence: one row per feed ──────────────────────────────
+// The same rule as the agent's atlasGate(): it fails closed on an error, a missing score or old data.
+function gateOf(a) {
+  if (!a) return ['', 'Waiting for the next agent report.'];
+  if (a.state === 'no_key') return ['', 'No Atlas key on the server: normal size.'];
+  if (a.state !== 'complete' || !a.consensusStatus) return ['bad', 'No score: no trade.'];
+  const readAt = a.fetchedAt ? Math.floor(Date.parse(a.fetchedAt) / 1000) : null;
+  if (a.ts && readAt && readAt - a.ts > 900) return ['bad', 'Old data: no trade.'];
+  if (a.signatureValid === false) return ['bad', 'Signature failed: no trade.'];
+  if (a.consensusStatus === 'HEALTHY') return ['done', 'Full size.'];
+  if (a.consensusStatus === 'DEGRADED') return ['wait', 'Half size.'];
+  return ['bad', 'No trade.'];
+}
+function renderFeeds() {
+  const body = $('#feedT tbody');
+  if (!body) return;
+  if (!S.markets.size) return;
+  const groups = new Map();
+  for (const m of S.markets.values()) {
+    const k = m.source === 0 ? `0:${m.feed}:${m.feedId}`.toLowerCase() : `1:${m.feed}`.toLowerCase();
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(m);
+  }
+  const order = ['IWMB', 'EWZB', 'BNB'];
+  const rows = [...groups.values()].map((ms) => {
+    const top = [...ms].sort((a, b) => (b.priceTs ?? 0) - (a.priceTs ?? 0))[0];
+    const rep = ms.map((m) => m.report).filter((r) => r?.inputs?.atlas).sort((a, b) => String(b.generatedAt).localeCompare(String(a.generatedAt)))[0];
+    return { m: top, a: rep?.inputs?.atlas ?? null, open: ms.filter(live).length, can: protectable(top.asset).length > 0 };
+  }).sort((x, y) => ((order.indexOf(x.m.asset) + 1 || 99) - (order.indexOf(y.m.asset) + 1 || 99)) || x.m.asset.localeCompare(y.m.asset));
+  body.innerHTML = rows.map(({ m, a, open, can }) => {
+    const id = m.source === 0 ? parseInt(m.feedId, 16) : null;
+    const score = num(a?.consensusScore);
+    const [gcls, gtxt] = m.source === 0 ? gateOf(a) : ['', 'Chainlink feed, no score: normal size.'];
+    const cons = m.source !== 0 ? '<span class="muted">-</span>'
+      : a?.consensusStatus ? `<span class="status ${CONS_CLS[a.consensusStatus] ?? 'bad'}">${esc(a.consensusStatus.replace('_', ' '))}</span> <span class="mono">${score != null ? esc(score.toFixed(2)) : ''}</span>`
+      : '<span class="muted">-</span>';
+    return `<tr>
+      <th scope="row"><b>${esc(m.asset)}</b> ${srcBadge(m.source)}<br><span class="small muted mono">${id != null ? `Feed id ${esc(String(id))} · ` : ''}${link(addrUrl(m.feed), short(m.feed))}</span></th>
+      <td class="r mono">${m.price != null ? esc(usd(m.price)) : '-'}</td>
+      <td class="small">${m.priceTs ? esc(ago(m.priceTs)) : '-'}</td>
+      <td>${cons}</td>
+      <td class="small"><span class="gate gate-${gcls || 'none'}">${esc(gtxt)}</span></td>
+      <td class="r mono">${open}</td>
+      <td>${can ? `<button type="button" class="btn btn-sm" data-feed-asset="${esc(m.asset)}">Protect ${esc(m.asset)}</button>` : ''}</td>
+    </tr>`;
+  }).join('');
+  const t = rows.map((r) => r.a?.fetchedAt).filter(Boolean).sort().pop();
+  $('#fdWhen').textContent = t ? `Atlas API read ${ago(Math.floor(Date.parse(t) / 1000))}. Prices at block #${S.block?.toLocaleString('en-US') ?? '-'}.` : 'Every feed the agent reads, and what it lets the agent do now.';
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest?.('[data-feed-asset]');
+  if (!b) return;
+  const r = document.querySelector(`#assetSeg input[value="${CSS.escape(b.dataset.feedAsset)}"]`);
+  if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+  $('#protect').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+});
 
 // ── Risk agent ───────────────────────────────────────────────────────
 const ACTION = { BUY_YES: ['buy', 'Buy cover'], BUY_NO: ['sell', 'Sell cover'], HOLD: ['', 'Hold'] };
@@ -1613,3 +1671,11 @@ if (!cfg.markets?.length) { const msg = $('#plotMsg'); msg.hidden = false; msg.t
 drawChart();
 await refresh();
 setInterval(refresh, 30_000);
+
+// The hero dot moves along its orbit. Stop it for people who ask for less motion.
+{
+  const mq = matchMedia('(prefers-reduced-motion: reduce)');
+  const svg = document.querySelector('#orbitPath')?.ownerSVGElement;
+  const apply = () => { if (!svg?.pauseAnimations) return; if (mq.matches) { svg.pauseAnimations(); svg.setCurrentTime(0); } else svg.unpauseAnimations(); };
+  apply(); mq.addEventListener?.('change', apply);
+}

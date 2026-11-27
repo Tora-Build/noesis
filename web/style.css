@@ -452,7 +452,7 @@ h2 { font-weight: 500; letter-spacing: -.02em; }
 /* How it works */
 .how-it { margin-top: 80px; padding-top: 48px; border-top: 1px solid var(--line-2); }
 .how-head h2 { margin: 0; font-size: clamp(26px, 3vw, 32px); line-height: 1.15; max-width: 640px; }
-.stack { list-style: none; margin: 40px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px; counter-reset: s; }
+.stack { list-style: none; margin: 40px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px; counter-reset: s; }
 .stack li { position: relative; display: flex; flex-direction: column; gap: 4px; padding-top: 24px; border-top: 1px solid var(--ink); }
 .stack li::before { content: ""; position: absolute; top: -4px; left: 0; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 1.5px var(--obsidian); }
 .stack-n { font-size: 12px; color: var(--ink-3); font-variant-numeric: tabular-nums; letter-spacing: .08em; }
@@ -626,3 +626,13 @@ dialog::backdrop { background: rgba(11, 13, 18, .55); }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .load-bar i { animation: none; left: 0; width: 100%; opacity: .6; } .spin { animation-duration: 2.4s; } }
 .cover-live .spin { margin-right: 0; }
+
+/* Oracle intelligence table */
+#feedT th[scope=row] { font-weight: 400; white-space: nowrap; text-transform: none; letter-spacing: normal; font-size: inherit; color: var(--ink); }
+#feedT th[scope=row] .small { font-size: 12px; }
+#feedT td { vertical-align: middle; }
+.gate { font-weight: 600; }
+.gate-done { color: var(--pos); }
+.gate-bad { color: var(--neg); }
+.gate-wait, .gate-none { color: var(--ink); }
+.feeds > .small.muted { margin: 12px 0 0; }
