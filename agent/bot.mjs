@@ -8,7 +8,7 @@
 
 import { dirname, join, resolve, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { parseGwei, parseUnits, getAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
@@ -164,6 +164,7 @@ export async function startBot(env = process.env) {
     const atlasRes = atlasIds.length ? await fetchConsensus(atlasIds) : { state: "skipped", feeds: {} };
     if (atlasIds.length) log({ job: "agent", action: "ATLAS_CONSENSUS", state: atlasRes.state, signatureValid: atlasRes.signatureValid ?? null, error: atlasRes.error ?? undefined,
       feeds: Object.values(atlasRes.feeds).map((f) => ({ id: f.feedId, status: f.consensusStatus, score: f.consensusScore, price: f.price })) });
+    if (atlasIds.length) saveAtlasHistory(join(OUT_DIR, "atlas-history.json"), atlasRes, atlasIds);
     for (const [market, m] of Object.entries(state.markets)) {
       if (state.done[market] || m.deadline <= now + 60 || !m.asset || !ASSETS[m.asset]) continue;
       try {
@@ -335,4 +336,22 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   process.on("unhandledRejection", (e) => fatal({ job: "bot", level: "error", action: "UNHANDLED_REJECTION", error: errText(e) }));
   process.on("uncaughtException", (e) => { fatal({ job: "bot", level: "fatal", action: "UNCAUGHT", error: errText(e) }); process.exit(1); });
   startBot().then(() => process.exit(0), (e) => { fatal({ job: "bot", level: "fatal", action: "START_FAILED", error: errText(e) }); process.exit(1); });
+}
+
+/**
+ * Keep 7 days of Atlas reads for the page: one point per feed per agent run (every 30 min).
+ * Public data only: the score, status, price and whether the signature verified.
+ */
+function saveAtlasHistory(file, res, ids) {
+  try {
+    let h = { points: [] };
+    try { h = JSON.parse(readFileSync(file, "utf8")); } catch {}
+    const t = Math.floor(Date.now() / 1000);
+    for (const id of ids) {
+      const f = res.feeds?.[id];
+      h.points.push(f ? { t, id, score: f.consensusScore, status: f.consensusStatus, price: f.price, sig: f.signatureValid } : { t, id, state: res.state });
+    }
+    h.points = h.points.filter((p) => p.t > t - 7 * 86400);
+    writeFileSync(file, JSON.stringify(h));
+  } catch {}
 }

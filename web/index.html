@@ -31,7 +31,7 @@
         <a href="#intel">Market data</a>
         <a href="#agent">Risk agent</a>
         <a href="#oracle">Oracle</a>
-        <a href="#feeds">Oracle intel</a>
+        <a href="intel.html" class="nav-page">Oracle intelligence</a>
       </nav>
       <div class="bar-end">
         <span class="net" id="net" title="Network and latest block"><i class="dot" aria-hidden="true"></i><span>BNB Chain</span><span class="mono muted" id="block"></span></span>
@@ -102,10 +102,10 @@
       <h2 id="used-h" class="kicker">What NOESIS runs on</h2>
       <ul class="used-list">
         <li><b>CoinMarketCap</b><span>Pro API: prices, 24h to 90d changes, daily candles, Fear and Greed and global data. The risk agent's market data.</span><a href="#intel">Market data</a></li>
-        <li><b>Atlas Oracle</b><span>Prices on chain settle IWMB and EWZB. The signed API and the Consensus Score set the agent's trade size.</span><a href="#feeds">Oracle intel</a></li>
+        <li><b>Atlas Oracle</b><span>Prices on chain settle IWMB and EWZB. The signed API and the Consensus Score set the agent's trade size.</span><a href="intel.html">Oracle intelligence</a></li>
         <li><b>Cournot</b><span>AI oracle. Its chance, with evidence, is one agent input when it has a matching market.</span><a href="#agent">Risk agent</a></li>
         <li><b>Sooth AMM</b><span>Market maker on BNB Chain. It sets the live price of cover, and you and the agent trade on it.</span><a href="#strikes">Levels</a></li>
-        <li><b>Chainlink</b><span>The BNB/USD feed settles the BNB markets.</span><a href="#feeds">Feeds</a></li>
+        <li><b>Chainlink</b><span>The BNB/USD feed settles the BNB markets.</span><a href="intel.html">Oracle intelligence</a></li>
       </ul>
     </section>
     <section class="app" id="protect" aria-labelledby="app-h">
@@ -245,32 +245,6 @@
             <p class="form-msg" id="tMsg" role="status"></p>
           </div>
         </details>
-      </section>
-    </div>
-
-    <div class="solo">
-      <section class="panel feeds" id="feeds" aria-labelledby="feeds-h">
-        <div class="panel-head">
-          <h2 id="feeds-h" class="panel-h">Oracle intelligence</h2>
-          <p class="muted small" id="fdWhen">Every feed the agent reads, and what it lets the agent do now.</p>
-        </div>
-        <div class="table-scroll">
-          <table class="grid-t" id="feedT">
-            <thead>
-              <tr>
-                <th scope="col">Feed</th>
-                <th scope="col" class="r">Live price</th>
-                <th scope="col">Updated</th>
-                <th scope="col">Consensus Score</th>
-                <th scope="col">Agent rule now</th>
-                <th scope="col" class="r">Open markets</th>
-                <th scope="col" aria-label="Action"></th>
-              </tr>
-            </thead>
-            <tbody><tr><td colspan="7" class="empty"><span class="skel skel-w"></span></td></tr></tbody>
-          </table>
-        </div>
-        <p class="small muted">Prices are read on chain. The Consensus Score comes from the signed Atlas API read in the last agent report (every 30 min). Atlas signs the price, not the score.</p>
       </section>
     </div>
 

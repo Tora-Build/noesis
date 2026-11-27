@@ -138,6 +138,10 @@ export async function buildWeb(o) {
   }) : [];
   const { keep, skipped } = filterReports(entries, config);
   for (const { report } of keep) writeFileSync(join(reportsDir, `${report.market.toLowerCase()}.json`), JSON.stringify(report, null, 2));
+  // Atlas Consensus Score history from the bot, for the Oracle intelligence page.
+  if (existsSync(join(src, 'atlas-history.json'))) {
+    try { writeFileSync(join(reportsDir, 'atlas-history.json'), JSON.stringify(JSON.parse(readFileSync(join(src, 'atlas-history.json'), 'utf8')))); } catch {}
+  }
   return { out, markets: markets.length, reports: keep.length, skipped };
 }
 
