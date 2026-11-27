@@ -25,13 +25,10 @@
         <span class="word">NOESIS</span>
       </a>
       <nav class="nav" aria-label="Sections">
+        <a href="#assets">Markets</a>
         <a href="#protect">Protect</a>
-        <a href="#chances">Chances</a>
-        <a href="#strikes">Levels</a>
-        <a href="#intel">Market data</a>
-        <a href="#agent">Risk agent</a>
-        <a href="#oracle">Oracle</a>
-        <a href="intel.html" class="nav-page">Oracle intelligence</a>
+        <a href="#settle">How it settles</a>
+        <a href="intel.html" class="nav-page">Oracle</a>
       </nav>
       <div class="bar-end">
         <span class="net" id="net" title="Network and latest block"><i class="dot" aria-hidden="true"></i><span>BNB Chain</span><span class="mono muted" id="block"></span></span>
@@ -39,7 +36,7 @@
         <button class="btn btn-amber" id="connect">Connect wallet</button>
       </div>
     </div>
-    <p class="demo-strip">Live on BSC mainnet. Paid in hUSD-DEMO, demo money with no value.</p>
+    <p class="demo-strip">Live on BNB Chain mainnet. You pay in <b>hUSD-DEMO</b>, demo money with no value.</p>
   </header>
 
   <section class="cover on-dark" id="top" aria-labelledby="hero-h">
@@ -84,55 +81,52 @@
       </g>
     </svg>
     <div class="cover-in">
-      <p class="eyebrow">The oracle-powered autonomous hedging agent</p>
+      <p class="eyebrow">Downside protection, settled by oracle</p>
       <h1 id="hero-h">Price the Unknown.</h1>
       <span class="rule-amber" aria-hidden="true"></span>
-      <p class="cover-lede">NOESIS does not just price market risk. It checks how reliable the data is behind every decision.</p>
-      <p class="cover-sub">Market data from CoinMarketCap, chances from Cournot, prices from the Sooth AMM on BNB Chain, and the Atlas Oracle to check the data and settle the result.</p>
+      <p class="cover-lede">Pick a price floor for IWMB, EWZB or BNB. If the price ends at or below it, you get paid. An agent checks the data before every trade.</p>
       <div class="cover-cta">
-        <a class="btn btn-amber btn-lg" href="#protect">Create protection <span aria-hidden="true">→</span></a>
-        <a class="btn btn-line btn-lg" href="#how-it-works">How it works</a>
+        <a class="btn btn-amber btn-lg" href="#protect">Protect a position <span aria-hidden="true">→</span></a>
       </div>
       <p class="cover-live" id="heroLive" aria-live="polite"><span class="spin" aria-hidden="true"></span> Loading live markets from BNB Chain…</p>
+    </div>
+    <div class="stack-band">
+      <ul class="stack-row" aria-label="What NOESIS runs on">
+        <li><img src="logos/cmc-icon.png" alt="" width="28" height="28"><span><b>CoinMarketCap</b>Market data for the agent</span></li>
+        <li><img src="logos/atlas.svg" alt="" width="28" height="28"><span><b>Atlas Oracle</b>Settles IWMB and EWZB. Consensus Score sets trade size</span></li>
+        <li><img src="logos/cournot.svg" alt="" width="28" height="28"><span><b>Cournot</b>AI chance, one agent input</span></li>
+        <li><img src="logos/sooth.svg" alt="" width="28" height="28"><span><b>Sooth AMM</b>Prices and trades cover</span></li>
+        <li><img src="logos/chainlink.png" alt="" width="28" height="28"><span><b>Chainlink</b>Settles BNB</span></li>
+      </ul>
     </div>
   </section>
 
   <main class="wrap">
-    <section class="used" aria-labelledby="used-h">
-      <h2 id="used-h" class="kicker">What NOESIS runs on</h2>
-      <ul class="used-list">
-        <li><b>CoinMarketCap</b><span>Pro API: prices, 24h to 90d changes, daily candles, Fear and Greed and global data. The risk agent's market data.</span><a href="#intel">Market data</a></li>
-        <li><b>Atlas Oracle</b><span>Prices on chain settle IWMB and EWZB. The signed API and the Consensus Score set the agent's trade size.</span><a href="intel.html">Oracle intelligence</a></li>
-        <li><b>Cournot</b><span>AI oracle. Its chance, with evidence, is one agent input when it has a matching market.</span><a href="#agent">Risk agent</a></li>
-        <li><b>Sooth AMM</b><span>Market maker on BNB Chain. It sets the live price of cover, and you and the agent trade on it.</span><a href="#strikes">Levels</a></li>
-        <li><b>Chainlink</b><span>The BNB/USD feed settles the BNB markets.</span><a href="intel.html">Oracle intelligence</a></li>
-      </ul>
-    </section>
-    <section class="app" id="protect" aria-labelledby="app-h">
-      <div class="app-head">
-        <p class="kicker">Risk protection</p>
-        <h2 id="app-h">Define your downside protection.</h2>
-        <p class="lede">Drag the amber line or type a level. If the price at the deadline is at or below the level, you get the payout. If it ends above, you get nothing. It is a payout, not a guaranteed floor.</p>
+    <section class="assets" id="assets" aria-labelledby="assets-h">
+      <div class="sec-head">
+        <h2 id="assets-h">Markets</h2>
+        <p class="muted small">Live feed prices on BNB Chain. 24h change from CoinMarketCap. Line: last 6 h of feed prices.</p>
       </div>
+      <div class="asset-grid" id="assetSeg" role="radiogroup" aria-label="Asset to protect"></div>
+    </section>
 
-      <div class="folio" id="folio" hidden>
-        <div class="folio-head">
-          <h3 class="panel-h" id="folio-h">Your portfolio</h3>
-          <p class="small muted" id="folioNote"></p>
-        </div>
-        <div id="folioBody"></div>
+    <section class="app" id="protect" aria-labelledby="app-h">
+      <div class="sec-head">
+        <h2 id="app-h">Protect <span id="lAsset">-</span></h2>
+        <p class="muted small">Drag the amber line or pick a level. If the price at the deadline is at or below it, you get the payout. If not, you get nothing.</p>
       </div>
 
       <div class="controls" role="group" aria-label="Market">
-        <div class="seg-wrap"><span class="seg-k" id="assetK">Asset</span><div class="seg" id="assetSeg" role="radiogroup" aria-labelledby="assetK"></div></div>
-        <div class="seg-wrap"><span class="seg-k" id="endK">Ends</span><div class="seg" id="endSeg" role="radiogroup" aria-labelledby="endK"></div></div>
+        <div class="seg-wrap"><span class="seg-k" id="endK">Ends</span><div class="seg tabs" id="endSeg" role="radiogroup" aria-labelledby="endK"></div></div>
         <div class="seg-wrap"><span class="seg-k" id="modeK">Cover</span><div class="seg" id="modeSeg" role="radiogroup" aria-labelledby="modeK">
           <label><input type="radio" name="mode" value="one" checked><span>One level</span></label>
           <label><input type="radio" name="mode" value="stair"><span>Staircase</span></label>
         </div></div>
+        <span class="lsrc" id="lSrc"></span>
       </div>
 
       <div class="stage">
+        <div class="stage-main">
         <div class="chart" id="chart">
           <div class="chart-top">
             <p class="now"><span class="now-k" id="nowK">-</span> <span class="now-p mono" id="nowP"><span class="skel" aria-hidden="true"></span></span> <span class="now-age muted" id="nowAge"></span></p>
@@ -150,7 +144,37 @@
             <p class="plot-msg" id="plotMsg" hidden></p>
           </div>
         </div>
+          <section class="strikes" id="strikes" aria-labelledby="ladder-h">
+            <div class="strikes-head">
+              <h3 id="ladder-h" class="panel-h">Levels</h3>
+              <p class="muted small" id="lWhen"></p>
+            </div>
+            <p class="ch-key small" aria-hidden="true"><span><i class="k-bar"></i>Market chance</span><span><i class="k-mk"></i>Agent estimate</span></p>
+            <ul class="strike-list" id="ladder" role="listbox" aria-labelledby="ladder-h"></ul>
+        <details class="more" id="trader">
+          <summary>Details: trader view</summary>
+          <div class="trader-in">
+            <p class="small muted">Market price is the live AMM price per $1 of payout. You can buy at it now. Agent estimate is the risk agent's fair chance, not a price you can trade. Cournot is an AI oracle's chance. Trade YES or NO shares on the selected level here.</p>
+            <div class="trader-row"><span class="mono small" id="tMarket">-</span></div>
+            <div class="trader-row">
+              <div class="seg" role="radiogroup" aria-label="Side">
+                <label><input type="radio" name="side" value="1" checked><span>YES</span></label>
+                <label><input type="radio" name="side" value="0"><span>NO</span></label>
+              </div>
+              <label class="sr" for="tShares">Shares</label>
+              <input id="tShares" class="field num" type="number" min="0" step="any" value="10">
+              <span class="small muted">shares</span>
+              <span class="mono small" id="tQuote"></span>
+              <button class="btn btn-ink btn-sm" id="tBuy" type="button">Buy</button>
+            </div>
+            <dl class="kv small" id="tState"></dl>
+            <p class="form-msg" id="tMsg" role="status"></p>
+          </div>
+        </details>
+          </section>
+        </div>
 
+        <aside class="ticket" aria-label="Your protection">
         <div class="readout" id="readout">
           <div class="ro-nums">
             <div class="ro-cell">
@@ -189,136 +213,54 @@
             <p class="faucet-inline small muted">Need test money? <button class="btn-link" type="button" data-faucet>Get 1,000 hUSD-DEMO</button></p>
           </form>
         </div>
-      </div>
+      <div class="folio" id="folio" hidden>
+        <div class="folio-head">
+          <h3 class="panel-h" id="folio-h">Your portfolio</h3>
+          <p class="small muted" id="folioNote"></p>
+        </div>
+        <div id="folioBody"></div>
 
       <div class="mine" id="mine" hidden>
         <h3 class="sub-h">Your cover</h3>
         <ul id="mineList" class="mine-list"></ul>
       </div>
-
+        </aside>
+      </div>
       <details class="more" id="ruleBox">
         <summary>Details: how this settles</summary>
         <div class="more-in" id="ruleBody"></div>
       </details>
     </section>
 
-    <div class="solo">
-      <section class="panel ladder" id="strikes" aria-labelledby="ladder-h">
-        <div class="panel-head">
-          <h2 id="ladder-h" class="panel-h">Levels for <span id="lAsset">-</span> <span id="lSrc"></span></h2>
-          <p class="muted small" id="lWhen"></p>
-        </div>
-        <div class="table-scroll">
-          <table class="grid-t" id="ladder">
-            <thead>
-              <tr>
-                <th scope="col">Level</th>
-                <th scope="col" class="r c-dist">From now</th>
-                <th scope="col" class="r">Market price</th>
-                <th scope="col" class="r">Agent estimate</th>
-                <th scope="col" class="r c-cour">Cournot</th>
-                <th scope="col" class="c-ag">Agent</th>
-                <th scope="col" class="r c-you">You have</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-
-        <details class="more" id="trader">
-          <summary>Details: trader view</summary>
-          <div class="trader-in">
-            <p class="small muted">Market price is the live AMM price per $1 of payout. You can buy at it now. Agent estimate is the risk agent's fair chance, not a price you can trade. Cournot is an AI oracle's chance. Trade YES or NO shares on the selected level here.</p>
-            <div class="trader-row"><span class="mono small" id="tMarket">-</span></div>
-            <div class="trader-row">
-              <div class="seg" role="radiogroup" aria-label="Side">
-                <label><input type="radio" name="side" value="1" checked><span>YES</span></label>
-                <label><input type="radio" name="side" value="0"><span>NO</span></label>
-              </div>
-              <label class="sr" for="tShares">Shares</label>
-              <input id="tShares" class="field num" type="number" min="0" step="any" value="10">
-              <span class="small muted">shares</span>
-              <span class="mono small" id="tQuote"></span>
-              <button class="btn btn-ink btn-sm" id="tBuy" type="button">Buy</button>
-            </div>
-            <dl class="kv small" id="tState"></dl>
-            <p class="form-msg" id="tMsg" role="status"></p>
-          </div>
-        </details>
-      </section>
-    </div>
-
-    <div class="cols">
-      <div class="col">
-      <section class="panel chances" id="chances" aria-labelledby="chances-h">
-        <div class="panel-head">
-          <h2 id="chances-h" class="panel-h">Chance by level</h2>
-          <p class="muted small" id="chWhen"></p>
-        </div>
-        <p class="ch-key small" aria-hidden="true"><span><i class="k-bar"></i>Market price</span><span><i class="k-mk"></i>Agent estimate</span></p>
-        <ul class="ch-list" id="chList"><li class="empty"><span class="skel skel-w"></span></li></ul>
-        <p class="small muted ch-note">Chances at the deadline from the market and the agent. Not a price forecast.</p>
-      </section>
-      <section class="panel intel" id="intel" aria-labelledby="intel-h">
-        <div class="panel-head">
-          <h2 id="intel-h" class="panel-h">Market intelligence</h2>
-          <p class="muted small" id="inWhen"></p>
-        </div>
-        <div id="inBody"><p class="empty">No CoinMarketCap data for this level yet.</p></div>
-      </section>
-      <section class="panel settled" id="settled" aria-labelledby="settled-h">
-        <div class="panel-head">
-          <h2 id="settled-h" class="panel-h">Settled</h2>
-          <p class="muted small">By the feed only.</p>
-        </div>
-        <ul id="setList" class="set-list"><li class="empty">Loading.</li></ul>
-      </section>
+    <section class="settle" id="settle" aria-labelledby="how-h">
+      <div class="sec-head">
+        <h2 id="how-h">How it settles</h2>
+        <p class="muted small">Data, then the agent, then the oracle. Each step shows its live state for the level you picked.</p>
       </div>
-      <div class="col">
-      <section class="panel agent" id="agent" aria-labelledby="agent-h">
-        <div class="panel-head">
-          <h2 id="agent-h" class="panel-h">Risk agent</h2>
-          <p class="muted small" id="agWhen"></p>
-        </div>
+      <ol class="steps3">
+        <li class="step3 panel" id="oracle" aria-labelledby="oracle-h">
+          <div class="step3-h"><span class="n">01</span><div><h3 id="oracle-h">Data</h3><p class="muted small">Price on chain. Consensus Score from the Atlas API.</p></div></div>
+          <div id="orBody"><p class="empty"><span class="skel skel-w"></span></p></div>
+          <details class="more" id="intel">
+            <summary>Market data from CoinMarketCap<span class="sr" id="inWhen"></span></summary>
+            <div id="inBody"><p class="empty">No CoinMarketCap data for this level yet.</p></div>
+          </details>
+        </li>
+        <li class="step3 panel" id="agent" aria-labelledby="agent-h">
+          <div class="step3-h"><span class="n">02</span><div><h3 id="agent-h">Agent</h3><p class="muted small" id="agWhen"></p></div></div>
         <div id="agBody"><p class="empty">No agent report for this level yet.</p></div>
         <div class="ag-foot">
           <button type="button" class="btn btn-sm" id="agRefresh">Refresh</button>
           <span class="small muted" id="agRefMsg" role="status"></span>
         </div>
-        <p class="small muted ag-line">Rule-based agent. It trades on its own with a daily cap. Cournot (AI oracle) is one input when a matching market exists.</p>
-      </section>
-      <section class="panel oracle" id="oracle" aria-labelledby="oracle-h">
-        <div class="panel-head">
-          <h2 id="oracle-h" class="panel-h">Oracle</h2>
-          <p class="muted small">Price on chain. Score from the Atlas API.</p>
-        </div>
-        <div id="orBody"><p class="empty"><span class="skel skel-w"></span></p></div>
-      </section>
-      </div>
-    </div>
-
-
-    <section class="how-it" id="how-it-works" aria-labelledby="how-h">
-      <div class="how-head">
-        <p class="kicker">How it works</p>
-        <h2 id="how-h">From market data to a settled result, with a check on the data at every step.</h2>
-      </div>
-      <ol class="stack" aria-label="The stack">
-        <li><span class="stack-n">01</span><b>Market data</b><span>CoinMarketCap prices, volatility and sentiment. Live feed prices from Atlas and Chainlink.</span></li>
-        <li><span class="stack-n">02</span><b>Probabilistic reasoning</b><span>The agent turns the data into a fair chance. Cournot, an AI oracle, adds its chance when it has a matching market.</span></li>
-        <li><span class="stack-n">03</span><b>Oracle-aware risk control</b><span>The agent checks the Atlas Consensus Score. HEALTHY: full size. DEGRADED: half size. Worse, an API error or old data: no trade.</span></li>
-        <li><span class="stack-n">04</span><b>Autonomous execution</b><span>When the market is far from the fair chance, the agent trades on the Sooth AMM on BNB Chain, within a daily cap.</span></li>
-        <li><span class="stack-n">05</span><b>Settlement</b><span>At the deadline, the contract reads the oracle price and writes the result. Nobody votes.</span></li>
+        
+          <p class="small muted ag-line">Rule-based. It trades on its own within a daily cap. Cournot, an AI oracle, is one input when it has a matching market.</p>
+        </li>
+        <li class="step3 panel" id="settled" aria-labelledby="settled-h">
+          <div class="step3-h"><span class="n">03</span><div><h3 id="settled-h">Settlement</h3><p class="muted small">At the deadline, anyone can settle from the oracle price. Nobody votes.</p></div></div>
+          <ul id="setList" class="set-list"><li class="empty">Loading.</li></ul>
+        </li>
       </ol>
-      <ul class="features">
-        <li><h3>AI risk intelligence</h3><p>The risk agent reads CoinMarketCap data and, when it exists, the Cournot chance. Fixed rules turn them into a fair chance.</p></li>
-        <li><h3>Probabilistic risk pricing</h3><p>Each level has a chance. The AMM price is the market's chance, and you can buy at it. The agent writes its own estimate.</p></li>
-        <li><h3>On-chain risk hedging</h3><p>Cover is a share in a market on BNB Chain. Each $1 of cover pays $1 if the price at the deadline is at or below the level.</p></li>
-        <li><h3>Programmable risk markets</h3><p>Each market has a fixed feed, level and end time. Nobody can change them after it opens.</p></li>
-        <li><h3>Portfolio protection</h3><p>Connect a wallet. Size cover from the IWMB, EWZB or BNB you really hold.</p></li>
-        <li><h3>Automated settlement</h3><p>At the deadline, anyone can settle from the oracle price. Nobody votes.</p></li>
-      </ul>
-
       <details class="more how" id="how">
         <summary>Details: who does what</summary>
         <ol class="steps">
@@ -339,10 +281,8 @@
           <svg class="mark" viewBox="31.5 0.5 97 97" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="80" cy="49" r="48.5" fill="#F9F4E3"/><circle cx="80" cy="49" r="39" fill="#FFD200" stroke="#0B0D12" stroke-width="7"/><path d="M47 68 A39 39 0 0 1 106 20 Z" fill="#F9F4E3"/><ellipse cx="80" cy="49" rx="43" ry="14" transform="rotate(-47 80 49)" fill="#F9F4E3" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="39" fill="none" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="5" fill="#0B0D12"/></svg>
           <span class="word">NOESIS</span>
         </span>
-        <p>Price the Unknown.</p>
-        <p class="built">Built on Sooth.</p>
+        <p class="built">Built on Sooth · <a href="intel.html">Oracle data</a> · <a href="https://github.com/Tora-Build/noesis">Source</a></p>
       </div>
-      <p class="foot-note"><strong>hUSD-DEMO is demo money with no value.</strong> Anyone can take 1,000 hUSD-DEMO a day from its faucet.</p>
       <dl class="contracts" id="contracts"></dl>
     </div>
   </footer>

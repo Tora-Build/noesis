@@ -337,7 +337,7 @@ async function loadHistory(asset) {
     if (last && Math.abs(last[1] / ap.price - 1) > 0.2) pts = [];
   }
   S.hist.set(key, { state: pts == null ? 'err' : pts.length >= 2 ? 'ok' : 'none', pts: pts ?? [] });
-  if (S.asset === asset && !drag) drawChart();
+  if (!drag) { renderSegs(); if (S.asset === asset) drawChart(); }
 }
 
 // FeedObserved holds the feed price used for the result and the tx. Try one wide query,
@@ -440,15 +440,53 @@ function pickDefaults() {
     // Default floor: the closest level under today's price.
     S.sel = ((ap && lv.find((m) => m.strike < ap.price)) ?? lv[0])?.addr ?? null;
   }
-  if (S.asset) loadHistory(S.asset);
+  for (const x of assets) loadHistory(x);
 }
 
+const ASSET_META = {
+  IWMB: { logo: 'logos/iwmb.png', name: 'Russell 2000 ETF' },
+  EWZB: { logo: 'logos/ewzb.png', name: 'Brazil ETF' },
+  BNB: { logo: 'logos/bnb.svg', name: 'BNB / USD' },
+};
+// Latest Atlas Consensus read for an asset, from the agent reports.
+const consOf = (asset) => marketsOf(asset).map((m) => m.report?.inputs?.atlas).filter((x) => x?.consensusStatus).sort((x, y) => String(y.fetchedAt).localeCompare(String(x.fetchedAt)))[0] ?? null;
+const sizeRule = (c) => (!c ? null : c.signatureValid === false ? 'No trade' : c.consensusStatus === 'HEALTHY' ? 'Full size' : c.consensusStatus === 'DEGRADED' ? 'Half size' : 'No trade');
+function sparkSvg(pts) {
+  if (!pts || pts.length < 2) return '<span class="spark-none">No feed history yet</span>';
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const W = 160, H = 40, dx = (x1 - x0) || 1, dy = (y1 - y0) || 1;
+  const d = pts.map((p, i) => `${i ? 'L' : 'M'}${(((p[0] - x0) / dx) * W).toFixed(1)} ${(H - 3 - ((p[1] - y0) / dy) * (H - 6)).toFixed(1)}`).join('');
+  const up = ys.at(-1) >= ys[0];
+  return `<svg class="spark ${up ? 'up' : 'dn'}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="${d}"/></svg>`;
+}
+function assetCard(x) {
+  const ap = assetPrice(x), r = assetReport(x), meta = ASSET_META[x] ?? { logo: null, name: '' };
+  const ch = num(r?.inputs?.cmc?.pct24h), cons = ap?.source === 0 ? consOf(x) : null;
+  const h = ap ? S.hist.get(histKey(ap)) : null;
+  const src = ap ? (ap.source === 0 ? `Atlas #${parseInt(ap.feedId, 16)}` : 'Chainlink') : '';
+  const lv = protectable(x).length;
+  const status = ap?.source === 0
+    ? (cons ? `<span class="status ${CONS_CLS[cons.consensusStatus] ?? 'bad'}">${esc(cons.consensusStatus.replace('_', ' '))} ${esc(num(cons.consensusScore)?.toFixed(2) ?? '')}</span><span class="a-rule">Agent: ${esc(sizeRule(cons))}</span>` : '<span class="status">No score yet</span>')
+    : ap ? '<span class="status plain">Not scored</span><span class="a-rule">Agent: Full size</span>' : '';
+  const label = `${x}, ${ap ? usd(ap.price) : 'no price'}${ch != null ? `, ${signed(ch)} in 24 h` : ''}, ${lv} open level${lv === 1 ? '' : 's'}`;
+  return `<label class="acard"><input type="radio" name="asset" value="${esc(x)}"${x === S.asset ? ' checked' : ''} aria-label="${esc(label)}"><span class="acard-in">
+    <span class="a-top">${meta.logo ? `<img src="${meta.logo}" alt="" width="36" height="36">` : ''}<span class="a-id"><b>${esc(x)}</b><span>${esc(meta.name)}</span></span><span class="src-b src-${ap?.source === 0 ? 'atlas' : 'cl'}">${esc(src)}</span></span>
+    <span class="a-px"><span class="mono a-price">${ap ? esc(usd(ap.price)) : '<span class="skel"></span>'}</span>${ch != null ? `<span class="a-ch ${ch >= 0 ? 'up' : 'dn'}">${esc(signed(ch))} <span class="muted">24h</span></span>` : ''}</span>
+    ${h?.state === 'loading' ? '<span class="spark-none">Loading feed history…</span>' : sparkSvg(h?.pts)}
+    <span class="a-foot">${status}<span class="a-lv">${lv} open level${lv === 1 ? '' : 's'}</span></span>
+  </span></label>`;
+}
 function renderSegs() {
   const radio = (name, v, label, on, title = '') => `<label${title ? ` title="${esc(title)}"` : ''}><input type="radio" name="${name}" value="${esc(v)}"${on ? ' checked' : ''}><span>${esc(label)}</span></label>`;
   const a = S.assets ?? [];
-  const srcOf = (x) => assetPrice(x)?.source;
-  const ah = a.length ? a.map((x) => `<label title="${esc(`${x}, settled by ${SRC_LONG[srcOf(x)] ?? 'its feed'}`)}"><input type="radio" name="asset" value="${esc(x)}"${x === S.asset ? ' checked' : ''}><span>${esc(x)}${srcOf(x) != null ? ` <i class="src-m src-${srcOf(x) === 0 ? 'atlas' : 'cl'}">${esc(SRC[srcOf(x)])}</i>` : ''}</span></label>`).join('') : '<span class="seg-empty"><span class="skel"></span></span>';
-  if ($('#assetSeg').innerHTML !== ah) $('#assetSeg').innerHTML = ah;
+  const ah = a.length ? a.map(assetCard).join('') : '<div class="acard skel-card"><span class="skel skel-w"></span></div>'.repeat(3);
+  const box = $('#assetSeg');
+  if (box.innerHTML !== ah) {
+    const had = box.contains(document.activeElement);
+    box.innerHTML = ah;
+    if (had) box.querySelector('input:checked')?.focus({ preventScroll: true });
+  }
   const ends = S.asset ? endsOf(S.asset) : [];
   const eh = ends.length ? ends.map((t) => radio('end', t, endLabel(t), t === S.end, `${when(t)}`)).join('') : '<span class="seg-empty"><span class="skel"></span></span>';
   if ($('#endSeg').innerHTML !== eh) $('#endSeg').innerHTML = eh;
@@ -811,30 +849,27 @@ function actionPill(r) {
 }
 
 function renderLadder() {
-  const tb = $('#ladder tbody');
-  const ms = S.asset ? protectable(S.asset).sort((a, b) => a.deadline - b.deadline || b.strike - a.strike) : [];
+  const list = $('#ladder');
+  const ms = levels();
   const ap = S.asset && assetPrice(S.asset);
-  const dls = [...new Set(ms.map((m) => m.deadline))];
   $('#lAsset').textContent = S.asset ?? '-';
-  const cons = S.asset ? marketsOf(S.asset).map((m) => m.report?.inputs?.atlas).filter((x) => x?.consensusStatus).sort((x, y) => String(y.fetchedAt).localeCompare(String(x.fetchedAt)))[0] : null;
-  $('#lSrc').innerHTML = (ap ? srcBadge(ap.source) : '') + (cons ? ` <a class="cons-chip" href="intel.html" title="Atlas Consensus Score, from the last agent report"><span class="status ${CONS_CLS[cons.consensusStatus] ?? 'bad'}">${esc(cons.consensusStatus.replace('_', ' '))} ${esc(num(cons.consensusScore)?.toFixed(2) ?? '')}</span></a>` : '');
-  $('#lWhen').textContent = dls.length === 1 ? `Ends ${when(dls[0])}` : dls.length ? `${dls.length} end times` : '';
-  if (!ms.length) { tb.innerHTML = `<tr><td colspan="7" class="empty">${S.markets.size ? 'No open levels for this asset.' : '<span class="skel skel-w"></span>'}</td></tr>`; return; }
-  tb.innerHTML = ms.map((m) => {
-    const d = m.report?.decision;
+  const cons = S.asset ? consOf(S.asset) : null;
+  $('#lSrc').innerHTML = (ap ? srcBadge(ap.source) : '') + (cons && ap?.source === 0 ? ` <a class="cons-chip" href="intel.html" title="Atlas Consensus Score, from the last agent report"><span class="status ${CONS_CLS[cons.consensusStatus] ?? 'bad'}">${esc(cons.consensusStatus.replace('_', ' '))} ${esc(num(cons.consensusScore)?.toFixed(2) ?? '')}</span></a>` : '');
+  $('#lWhen').textContent = S.end ? `At the deadline, ${when(S.end)}` : '';
+  if (!ms.length) { list.innerHTML = `<li class="empty">${S.markets.size ? 'No open levels for this end time.' : '<span class="skel skel-w"></span>'}</li>`; return; }
+  const w = (p) => (p == null ? 0 : Math.max(0, Math.min(100, p * 100)));
+  list.innerHTML = ms.map((m) => {
     const dist = ap ? (m.strike / ap.price - 1) * 100 : null;
-    const you = m.pos && (m.pos.yes > 0 || m.pos.no > 0) ? `${m.pos.yes > 0 ? usd(m.pos.yes) : ''}${m.pos.no > 0 ? `<span class="gap-note">${m.pos.no.toFixed(2)} NO</span>` : ''}` : '<span class="muted">-</span>';
-    const fair = fairOf(m), cour = cournotOf(m);
+    const fair = fairOf(m), cour = cournotOf(m), sel = m.addr === S.sel;
     const inLeg = S.plan?.legs?.some((l) => l.m.addr === m.addr);
-    return `<tr tabindex="0" data-m="${esc(m.addr)}" aria-selected="${m.addr === S.sel}"${inLeg && m.addr !== S.sel ? ' class="leg"' : ''}>
-      <td><span class="lvl">${usd(m.strike)}</span>${dls.length > 1 ? `<span class="kind">${esc(endLabel(m.deadline))}</span>` : ''}</td>
-      <td class="r c-dist mono">${dist == null ? '-' : signed(dist, 1)}</td>
-      <td class="r">${cents(m.yes)}</td>
-      <td class="r">${cents(fair)}</td>
-      <td class="r c-cour">${cour == null ? '<span class="muted">-</span>' : pct(cour)}</td>
-      <td class="c-ag">${actionPill(m.report)}</td>
-      <td class="r c-you">${S.account ? you : '<span class="muted">-</span>'}</td>
-    </tr>`;
+    const you = S.account && m.pos && m.pos.yes > 0 ? `<span class="s-you">You: ${usd(m.pos.yes)}</span>` : '';
+    const label = `${usd(m.strike)}, ${dist == null ? '' : `${signed(dist, 1)} from now, `}market price ${cents(m.yes)}, agent estimate ${fair == null ? 'none' : pct(fair)}`;
+    return `<li role="option" tabindex="${sel ? 0 : -1}" data-m="${esc(m.addr)}" aria-selected="${sel}" aria-label="${esc(label)}" class="strike${inLeg && !sel ? ' leg' : ''}">
+      <span class="s-lv"><b class="mono">${usd(m.strike, Number.isInteger(m.strike) ? 0 : 2)}</b><span class="mono muted">${dist == null ? '-' : signed(dist, 1)}</span></span>
+      <span class="s-track" aria-hidden="true"><i class="ch-bar" style="width:${w(m.yes).toFixed(1)}%"></i>${fair != null ? `<b class="ch-mk" style="left:${w(fair).toFixed(1)}%"></b>` : ''}</span>
+      <span class="s-nums" aria-hidden="true"><span class="mono s-px">${cents(m.yes)}</span><span class="mono s-ag">${fair == null ? '-' : pct(fair)}</span></span>
+      <span class="s-ag2" aria-hidden="true">${actionPill(m.report)}${cour != null ? `<span class="s-cour">Cournot ${pct(cour)}</span>` : ''}${you}</span>
+    </li>`;
   }).join('');
 }
 
@@ -970,7 +1005,8 @@ function consensusBlock(m) {
   return `<div class="cons">
       <div class="cons-top"><p class="cons-h">Atlas Consensus Score</p><span class="status ${CONS_CLS[a.consensusStatus] ?? 'bad'}">${esc(a.consensusStatus.replace('_', ' '))}</span></div>
       <p class="cons-score mono">${score != null ? esc(score.toFixed(2)) : '-'}<span class="muted"> / 1</span></p>
-      <p class="small">${esc(rule)}</p>
+      <p class="small">How much the price sources agree. ${esc(rule)}</p>
+      <details class="more or-more"><summary>Score details</summary>
       <dl class="kv or-kv small">
         <dt>Atlas API price</dt><dd class="mono">${a.price != null ? esc(usd(a.price)) : '-'}${gap != null ? ` <span class="muted">(${esc(gap.toFixed(3))}% from on chain)</span>` : ''}</dd>
         <dt>TWAP</dt><dd class="mono">${a.twapPrice != null ? esc(usd(a.twapPrice)) : '-'}</dd>
@@ -978,6 +1014,7 @@ function consensusBlock(m) {
         <dt>Read</dt><dd>${a.fetchedAt ? `${esc(when(Math.floor(Date.parse(a.fetchedAt) / 1000)))}, ${esc(ago(Math.floor(Date.parse(a.fetchedAt) / 1000)))}` : '-'} · <code>POST /v1/price/latest</code></dd>
       </dl>
       <p class="small">${link(IMPL_ATLAS, 'Implementation')}</p>
+      </details>
     </div>`;
 }
 function renderOracle() {
@@ -989,6 +1026,9 @@ function renderOracle() {
   const age = m.priceTs ? S.now - m.priceTs : null;
   body.innerHTML = `
     <div class="or-top">${srcBadge(m.source)}<span class="status ${cls}">${esc(label)}</span></div>
+    <p class="or-now"><span class="mono">${m.price != null ? esc(usd(m.price)) : '-'}</span> <span class="muted small">${m.priceTs ? esc(ago(m.priceTs)) : ''}</span></p>
+    ${m.source === 0 ? consensusBlock(m) : ''}
+    <details class="more or-more"><summary>Feed details</summary>
     <dl class="kv or-kv small">
       <dt>Feed contract</dt><dd>${link(addrUrl(m.feed), short(m.feed))}</dd>
       ${m.source === 0 ? `<dt>Feed id</dt><dd class="mono">${esc(String(id))} (${esc(m.feedId)})</dd><dt>Read</dt><dd><code>fetch(bytes4 feedId)</code>, 18 decimals</dd>` : '<dt>Read</dt><dd><code>latestRoundData()</code></dd>'}
@@ -998,9 +1038,8 @@ function renderOracle() {
       <dt>Network</dt><dd>BNB Smart Chain mainnet</dd>
       <dt>Level</dt><dd>${esc(usd(m.strike))}, at the deadline ${esc(when(m.deadline))}</dd>
       ${o ? `<dt>Price used</dt><dd class="mono">${esc(usd(o.price))} <span class="muted">at ${esc(when(o.ts))}</span></dd><dt>Settlement tx</dt><dd>${link(txUrl(o.tx), short(o.tx))}</dd>` : ''}
-    </dl>
-    ${m.source === 0 ? consensusBlock(m) : ''}
-    <p class="or-rule">At the deadline, anyone can call settle; the contract reads this feed; the price must be at most ${esc(String(m.maxDelay))} s old; no person can change the result.</p>
+    </dl></details>
+    <p class="or-rule">At the deadline, the contract reads this feed. The price must be less than ${esc(String(m.maxDelay))} s old. Nobody can change the result.</p>
     <p class="small">${link(IMPL_ADJ, 'Implementation')} · ${link(addrUrl(cfg.adjudicator), 'Adjudicator contract')}</p>`;
 }
 
@@ -1010,13 +1049,13 @@ function agentReasons(r) {
   const d = r.decision ?? {}, p = d.params ?? {}, inp = r.inputs ?? {};
   const out = [];
   const e = num(d.edge), th = num(p.edgeThreshold);
-  if (e != null) out.push(`Edge ${signed(e * 100, 1)}: agent estimate ${pct(num(d.pStar))} minus market price ${pct(num(d.pSooth))}. ${th != null ? `The threshold is ${pct(th)}, so the edge is ${Math.abs(e) > th ? 'outside it: a trade is allowed' : 'inside it: no trade'}.` : ''}`);
+  if (e != null) out.push(`Edge ${signed(e * 100, 1)}: the agent's chance (${pct(num(d.pStar))}) minus the market price (${pct(num(d.pSooth))}). ${th != null ? `The agent trades only when the gap is more than ${pct(th)}. ${Math.abs(e) > th ? 'Here it is, so a trade is allowed.' : 'Here it is not, so no trade.'}` : ''}`);
   const risk = num(d.risk) ?? num(inp.model?.risk?.score), cap = num(p.riskCap);
-  if (risk != null) out.push(`Risk score ${Math.round(risk)} of 100. ${cap != null ? `The cap is ${cap}, so the risk is ${risk >= cap ? 'at or above the cap: no trade' : 'under the cap'}.` : ''}`);
+  if (risk != null) out.push(`Risk ${Math.round(risk)} of 100: how hard the result is to predict, from price swings, market mood and how near the price is to the level. A higher risk means a smaller trade.${cap != null ? ` At ${cap} or more, no trade.` : ''}`);
   const at = inp.atlas;
-  if (at?.state === 'complete' && at.consensusStatus) out.push(`Atlas Consensus ${at.consensusStatus} (${num(at.consensusScore)?.toFixed(2) ?? '-'}), signature ${at.signatureValid ? 'valid' : 'not valid'}. ${at.signatureValid === false ? 'No trade.' : at.consensusStatus === 'HEALTHY' ? 'Full size allowed.' : at.consensusStatus === 'DEGRADED' ? 'Size is halved.' : 'No trade.'}`);
+  if (at?.state === 'complete' && at.consensusStatus) out.push(`Atlas data ${at.consensusStatus.replace('_', ' ')} (${num(at.consensusScore)?.toFixed(2) ?? '-'})${at.signatureValid === false ? ', signature not valid' : ''}. ${at.signatureValid === false ? 'No trade.' : at.consensusStatus === 'HEALTHY' ? 'Full size.' : at.consensusStatus === 'DEGRADED' ? 'Half size.' : 'No trade.'}`);
   const pc = num(d.pCournot);
-  out.push(pc != null ? `Cournot used: ${pct(pc)}, weight ${num(p.cournotWeight) ?? '-'}.` : `Cournot not used${inp.cournot?.state ? ` (${inp.cournot.state})` : ''}.`);
+  out.push(pc != null ? `Cournot says ${pct(pc)}. It counts for ${pct(num(p.cournotWeight), 0)} of the agent's chance.` : 'Cournot is not used for this level.');
   if ((d.alerts ?? []).some((a) => (a?.code ?? a) === 'FEED_STALE')) out.push('The feed is old, so the agent holds. Atlas stock feeds pause when the stock market is closed.');
   if (d.action === 'HOLD' && d.reason) out.push(`Decision: ${d.reason}`);
   if (num(d.sizeUsd)) out.push(`Size ${usd(d.sizeUsd)}${num(p.bankroll) ? ` of a ${usd(p.bankroll, 0)} bankroll` : ''}.`);
@@ -1141,6 +1180,7 @@ function fairOf(m) { return num(m?.report?.decision?.pStar) ?? num(m?.report?.de
 
 function renderChances() {
   const list = $('#chList');
+  if (!list) return;
   const ap = S.asset && assetPrice(S.asset), lv = levels();
   $('#chWhen').textContent = S.asset && S.end ? `${S.asset}, at the deadline ${endLabel(S.end)} UTC` : '';
   if (!S.markets.size) { list.innerHTML = '<li class="empty"><span class="skel skel-w"></span></li>'; return; }
@@ -1539,12 +1579,12 @@ const pickRow = (tr) => {
   if (!m) return;
   if (m.deadline !== S.end) { S.end = m.deadline; S.sel = m.addr; renderAll(); } else setFloor(m.addr);
 };
-$('#ladder tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-m]'); if (tr) pickRow(tr); });
-$('#ladder tbody').addEventListener('keydown', (e) => {
-  const tr = e.target.closest('tr[data-m]');
+$('#ladder').addEventListener('click', (e) => { const tr = e.target.closest('li[data-m]'); if (tr) { pickRow(tr); $(`#ladder li[data-m="${tr.dataset.m}"]`)?.focus({ preventScroll: true }); } });
+$('#ladder').addEventListener('keydown', (e) => {
+  const tr = e.target.closest('li[data-m]');
   if (!tr) return;
-  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickRow(tr); $(`#ladder tr[data-m="${tr.dataset.m}"]`)?.focus(); }
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); (e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling)?.focus(); }
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickRow(tr); $(`#ladder li[data-m="${tr.dataset.m}"]`)?.focus(); }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const nx = e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling; if (nx?.dataset.m) { pickRow(nx); $(`#ladder li[data-m="${nx.dataset.m}"]`)?.focus(); } }
 });
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]');
@@ -1561,7 +1601,7 @@ lvlInput.addEventListener('keydown', (e) => {
 });
 lvlInput.addEventListener('change', () => takeLevel(snapLevel(Number(lvlInput.value))));
 lvlInput.addEventListener('blur', () => syncLevelInput());
-$('#chList').addEventListener('click', (e) => {
+$('#chList')?.addEventListener('click', (e) => {
   const b = e.target.closest('[data-m]');
   if (!b) return;
   setFloor(b.dataset.m);

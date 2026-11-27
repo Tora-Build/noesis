@@ -10,6 +10,7 @@ const ADJ = parseAbi([
 const AMM = parseAbi(['function getMarketState(address) view returns (uint256 qYes, uint256 qNo, uint256 price)']);
 const ATLAS_IDS = { 1163: 'EWJB', 1164: 'EWTB', 1165: 'EWZB', 1166: 'IWMB', 1167: 'MELIB', 1168: 'NUB' };
 const NAMES = { IWMB: 'Russell 2000 ETF, tokenized', EWZB: 'Brazil ETF, tokenized', BNB: 'BNB / USD' };
+const LOGO = { IWMB: 'logos/iwmb.png', EWZB: 'logos/ewzb.png', BNB: 'logos/bnb.svg' };
 const ORDER = ['IWMB', 'EWZB', 'BNB'];
 const SRC_LONG = ['Atlas Oracle', 'Chainlink'];
 const CLOSE_BELOW = 1;
@@ -37,7 +38,7 @@ const chain = defineChain({
 });
 const pub = createPublicClient({ chain, transport: http(cfg.rpc), batch: { multicall: true } });
 
-const S = { now: Math.floor(Date.now() / 1000), block: null, feeds: [], markets: [], reports: new Map(), hist: [], readAt: null };
+const S = { tab: null, now: Math.floor(Date.now() / 1000), block: null, feeds: [], markets: [], reports: new Map(), hist: [], readAt: null };
 const ago = (ts) => {
   const s = Math.max(0, S.now - Number(ts));
   return s < 90 ? `${s}s ago` : s < 5400 ? `${Math.round(s / 60)} min ago` : s < 172800 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} days ago`;
@@ -145,20 +146,40 @@ function feedCard(f) {
     a?.state === 'complete' ? ['Signature', a.signatureValid ? `Valid, signer ${esc(short(a.signer ?? ''))}` : '<b>Did not verify</b>'] : null,
     a?.fetchedAt ? ['Atlas API read', esc(ago(Math.floor(Date.parse(a.fetchedAt) / 1000)))] : null,
   ].filter(Boolean).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('');
-  const levels = prot.slice(0, 4).map((m) => `<li><span>Below ${esc(usd(wad(BigInt(m.strike)), 2))}</span><span class="muted">${esc(when(m.deadline).replace(' UTC', ''))}</span><span class="mono">${esc(pct(m.chance))}</span></li>`).join('');
-  return `<article class="ix-card" aria-labelledby="f-${esc(f.asset)}">
-    <div class="ix-card-top"><div><h3 id="f-${esc(f.asset)}">${esc(f.asset)}</h3><p class="small muted">${esc(NAMES[f.asset] ?? '')}</p></div>${srcBadge(f.source)}</div>
-    <p class="ix-price mono">${f.price != null ? esc(usd(f.price)) : '-'}</p>
-    <p class="small muted ix-upd"><i class="dot" aria-hidden="true"></i>${f.ts ? `Updated ${esc(ago(f.ts))}, on chain` : 'No price read yet'}</p>
-    ${scoreBlock}
-    <div class="ix-gate ix-gate-${g.cls}"><p class="ix-label">Agent rule now</p><p class="ix-gate-v">${esc(g.label)}</p><p class="small">${esc(g.why)}</p></div>
-    <details class="ix-more"><summary>Feed details</summary><dl class="kv small">${dl}</dl></details>
-    <div class="ix-mk">
+  const levels = prot.map(mkCard).join('');
+  return `<article class="ix-card ix-wide" aria-labelledby="f-${esc(f.asset)}">
+    <div class="ix-col">
+      <div class="ix-card-top">${LOGO[f.asset] ? `<img src="${LOGO[f.asset]}" alt="" width="40" height="40">` : ''}<div><h3 id="f-${esc(f.asset)}">${esc(f.asset)}</h3><p class="small muted">${esc(NAMES[f.asset] ?? '')}</p></div>${srcBadge(f.source)}</div>
+      <p class="ix-price mono">${f.price != null ? esc(usd(f.price)) : '-'}</p>
+      <p class="small muted ix-upd"><i class="dot" aria-hidden="true"></i>${f.ts ? `Updated ${esc(ago(f.ts))}, on chain` : 'No price read yet'}</p>
+      ${scoreBlock}
+    </div>
+    <div class="ix-col">
+      <div class="ix-gate ix-gate-${g.cls}"><p class="ix-label">Agent rule now</p><p class="ix-gate-v">${esc(g.label)}</p><p class="small">${esc(g.why)}</p></div>
+      <div class="ix-dl"><p class="ix-label">Feed details</p><dl class="kv small">${dl}</dl></div>
+    </div>
+    <div class="ix-col ix-mk">
       <p class="ix-label">${openN} open market${openN === 1 ? '' : 's'}</p>
-      ${levels ? `<ul class="ix-levels" aria-label="Protection levels: level, end, market chance">${levels}</ul>` : '<p class="small muted">No open protection level.</p>'}
+      ${levels ? `<ul class="mk-cards">${levels}</ul>` : '<p class="small muted">No open protection level.</p>'}
       ${prot.length ? `<a class="btn btn-ink btn-sm" href="./?asset=${encodeURIComponent(f.asset)}#protect">Protect ${esc(f.asset)}</a>` : ''}
     </div>
   </article>`;
+}
+
+// One market as a small card: level, end, market chance bar, agent estimate, agent action.
+function mkCard(m) {
+  const r = reportOf(m), d = r?.decision, a = r?.inputs?.atlas;
+  const ag = num(d?.pStar) ?? num(d?.pModel), ch = m.chance;
+  const w = (p) => (p == null ? 0 : Math.max(0, Math.min(100, p * 100)));
+  const cons = Number(m.source) !== 0 ? '<span class="status plain">Chainlink</span>'
+    : a?.consensusStatus ? `<span class="status ${CONS_CLS[a.consensusStatus] ?? 'bad'}">${esc(a.consensusStatus.replace('_', ' '))} ${esc(num(a.consensusScore)?.toFixed(2) ?? '')}</span>` : '';
+  const act = d ? `${esc(ACT[d.action] ?? d.action)}${d?.consensus?.applies && d.consensus.sizeMultiplier < 1 && d.consensus.sizeMultiplier > 0 ? ', half size' : ''}` : 'No report';
+  return `<li class="mk-card"><a href="./?asset=${encodeURIComponent(assetOf(m))}#protect" aria-label="${esc(`${assetOf(m)} ${KIND[m.kind] ?? ''} ${usd(wad(BigInt(m.strike)))}, ends ${when(m.deadline)}, market chance ${pct(ch)}, agent estimate ${pct(ag)}`)}">
+    <span class="mk-top"><b>${esc(KIND[m.kind] === 'below' ? 'Below' : KIND[m.kind] ?? '')} ${esc(usd(wad(BigInt(m.strike))))}</b><span class="muted small">${esc(when(m.deadline))}</span></span>
+    <span class="mk-ch"><span class="mono">${esc(pct(ch))}</span><span class="muted small">market chance</span></span>
+    <span class="s-track" aria-hidden="true"><i class="ch-bar" style="width:${w(ch).toFixed(1)}%"></i>${ag != null ? `<b class="ch-mk" style="left:${w(ag).toFixed(1)}%"></b>` : ''}</span>
+    <span class="mk-foot"><span class="small">Agent ${esc(pct(ag))} · ${act}</span>${cons}</span>
+  </a></li>`;
 }
 
 const RULES = [
@@ -176,30 +197,27 @@ function renderRules(gates) {
 }
 
 const ACT = { BUY_YES: 'Bought cover', BUY_NO: 'Sold cover', HOLD: 'Hold' };
-function renderTable() {
-  const rows = [...S.markets].sort((a, b) => ((ORDER.indexOf(assetOf(a)) + 1 || 99) - (ORDER.indexOf(assetOf(b)) + 1 || 99)) || a.deadline - b.deadline || Number(BigInt(b.strike) - BigInt(a.strike)));
-  $('#mkT tbody').innerHTML = rows.length ? rows.map((m) => {
-    const r = reportOf(m), d = r?.decision, a = r?.inputs?.atlas;
-    const cons = Number(m.source) !== 0 ? '<span class="muted small">Chainlink</span>'
-      : a?.consensusStatus ? `<span class="status ${CONS_CLS[a.consensusStatus] ?? 'bad'}">${esc(a.consensusStatus.replace('_', ' '))}</span> <span class="mono small">${esc(num(a.consensusScore)?.toFixed(2) ?? '')}</span>`
-      : '<span class="muted">-</span>';
-    return `<tr>
-      <th scope="row"><b>${esc(assetOf(m))}</b> ${esc(KIND[m.kind] ?? '')} ${esc(usd(wad(BigInt(m.strike))))}</th>
-      <td class="small">${esc(when(m.deadline))}</td>
-      <td class="r mono">${esc(pct(m.chance))}</td>
-      <td class="r mono">${esc(pct(num(d?.pStar) ?? num(d?.pModel)))}</td>
-      <td>${cons}</td>
-      <td class="small"${d?.reason ? ` title="${esc(d.reason)}"` : ''}>${d ? esc(ACT[d.action] ?? d.action) : '<span class="muted">-</span>'}${d?.consensus?.applies && d.consensus.sizeMultiplier < 1 && d.consensus.sizeMultiplier > 0 ? ' <span class="muted">(half size)</span>' : ''}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="6" class="empty">No open market.</td></tr>';
+function feedTab(f) {
+  const a = f.source === 0 ? atlasOf(f) : null, g = gateOf(a, f.source), on = f.asset === S.tab;
+  const chip = f.source !== 0 ? '<span class="status plain">Not scored</span>' : a?.consensusStatus ? `<span class="status ${CONS_CLS[a.consensusStatus] ?? 'bad'}">${esc(a.consensusStatus.replace('_', ' '))} ${esc(num(a.consensusScore)?.toFixed(2) ?? '')}</span>` : '<span class="status">No score yet</span>';
+  return `<button type="button" class="acard ix-tab" role="tab" id="t-${esc(f.asset)}" aria-selected="${on}" aria-controls="feedGrid" tabindex="${on ? 0 : -1}" data-a="${esc(f.asset)}"><span class="acard-in">
+    <span class="a-top">${LOGO[f.asset] ? `<img src="${LOGO[f.asset]}" alt="" width="36" height="36">` : ''}<span class="a-id"><b>${esc(f.asset)}</b><span>${esc(NAMES[f.asset] ?? '')}</span></span>${srcBadge(f.source)}</span>
+    <span class="a-px"><span class="mono a-price">${f.price != null ? esc(usd(f.price)) : '-'}</span></span>
+    <span class="a-foot">${chip}<span class="a-rule">Agent: ${esc(g.label)}</span></span>
+  </span></button>`;
 }
 
 function render() {
   $('#block').textContent = S.block != null ? `#${S.block.toLocaleString('en-US')}` : '';
-  $('#feedGrid').innerHTML = S.feeds.map(feedCard).join('');
+  if (!S.feeds.some((f) => f.asset === S.tab)) S.tab = S.feeds[0]?.asset ?? null;
+  const tabs = $('#feedTabs'), had = tabs.contains(document.activeElement);
+  tabs.innerHTML = S.feeds.map(feedTab).join('');
+  if (had) tabs.querySelector('[aria-selected="true"]')?.focus();
+  const sel = S.feeds.find((f) => f.asset === S.tab);
+  $('#feedGrid').setAttribute('aria-labelledby', `t-${S.tab}`);
+  $('#feedGrid').innerHTML = sel ? feedCard(sel) : '';
   const gates = S.feeds.map((f) => ({ asset: f.asset, source: f.source, g: gateOf(f.source === 0 ? atlasOf(f) : null, f.source) }));
   renderRules(gates);
-  renderTable();
   $('#kFeeds').textContent = String(S.feeds.filter((f) => f.price != null).length);
   const atlasGates = gates.filter((x) => x.source === 0);
   const labels = [...new Set(atlasGates.map((x) => x.g.label))];
@@ -211,6 +229,15 @@ function render() {
 }
 
 S.feeds = groupMarkets();
+S.tab = new URLSearchParams(location.search).get('feed') ?? null;
+$('#feedTabs').addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b) { S.tab = b.dataset.a; render(); b.isConnected || $(`#t-${S.tab}`)?.focus(); } });
+$('#feedTabs').addEventListener('keydown', (e) => {
+  if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+  e.preventDefault();
+  const list = S.feeds.map((f) => f.asset), i = list.indexOf(S.tab);
+  const j = e.key === 'Home' ? 0 : e.key === 'End' ? list.length - 1 : (i + (e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length;
+  S.tab = list[j]; render(); $(`#t-${S.tab}`)?.focus();
+});
 async function tick(first = false) {
   try {
     await readChain();
