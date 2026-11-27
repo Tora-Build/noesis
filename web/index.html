@@ -72,16 +72,22 @@
       <g clip-path="url(#plClip)" opacity="0.09"><rect x="200" y="200" width="760" height="420" filter="url(#plGrain)"/></g>
       <circle cx="900" cy="860" r="640" fill="none" stroke="url(#plRim)" stroke-width="20" filter="url(#plGlow)" opacity="0.6"/>
       <circle cx="900" cy="860" r="640" fill="none" stroke="url(#plRim)" stroke-width="2.5"/>
-      <path class="orbit" d="M120 640 C 300 360, 560 170, 900 70" fill="none"/>
-      <circle cx="450" cy="287.5" r="14" fill="#FFD200" opacity="0.22"/>
-      <circle cx="450" cy="287.5" r="5.5" fill="#FFD200"/>
+      <path class="orbit" id="orbitPath" d="M120 640 C 300 360, 560 170, 900 70" fill="none"/>
+      <g class="orb-dot">
+        <circle r="14" fill="#FFD200" opacity="0.22">
+          <animate attributeName="r" values="12;22;12" dur="3.2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.3;0.06;0.3" dur="3.2s" repeatCount="indefinite"/>
+        </circle>
+        <circle r="5.5" fill="#FFD200"/>
+        <animateMotion dur="18s" repeatCount="indefinite" calcMode="spline" keyPoints="0.42;0.92;0.12;0.42" keyTimes="0;0.4;0.8;1" keySplines=".45 0 .55 1;.45 0 .55 1;.45 0 .55 1"><mpath href="#orbitPath"/></animateMotion>
+      </g>
     </svg>
     <div class="cover-in">
-      <p class="eyebrow">Autonomous financial intelligence infrastructure</p>
+      <p class="eyebrow">The oracle-powered autonomous hedging agent</p>
       <h1 id="hero-h">Price the Unknown.</h1>
       <span class="rule-amber" aria-hidden="true"></span>
-      <p class="cover-lede">Transform market uncertainty into programmable financial protection.</p>
-      <p class="cover-sub">It joins market data from CoinMarketCap, chances from Cournot, prices from the Sooth AMM on BNB Chain and settlement by the Atlas Oracle or Chainlink.</p>
+      <p class="cover-lede">NOESIS does not just price market risk. It checks how reliable the data is behind every decision.</p>
+      <p class="cover-sub">Market data from CoinMarketCap, chances from Cournot, prices from the Sooth AMM on BNB Chain, and the Atlas Oracle to check the data and settle the result.</p>
       <div class="cover-cta">
         <a class="btn btn-amber btn-lg" href="#protect">Create protection <span aria-hidden="true">→</span></a>
         <a class="btn btn-line btn-lg" href="#how-it-works">How it works</a>
@@ -280,16 +286,43 @@
       </div>
     </div>
 
+    <div class="solo">
+      <section class="panel feeds" id="feeds" aria-labelledby="feeds-h">
+        <div class="panel-head">
+          <h2 id="feeds-h" class="panel-h">Oracle intelligence</h2>
+          <p class="muted small" id="fdWhen">Every feed the agent reads, and what it lets the agent do now.</p>
+        </div>
+        <div class="table-scroll">
+          <table class="grid-t" id="feedT">
+            <thead>
+              <tr>
+                <th scope="col">Feed</th>
+                <th scope="col" class="r">Live price</th>
+                <th scope="col">Updated</th>
+                <th scope="col">Consensus Score</th>
+                <th scope="col">Agent rule now</th>
+                <th scope="col" class="r">Open markets</th>
+                <th scope="col" aria-label="Action"></th>
+              </tr>
+            </thead>
+            <tbody><tr><td colspan="7" class="empty"><span class="skel skel-w"></span></td></tr></tbody>
+          </table>
+        </div>
+        <p class="small muted">Prices are read on chain. The Consensus Score comes from the signed Atlas API read in the last agent report (every 30 min). Atlas signs the price, not the score.</p>
+      </section>
+    </div>
+
     <section class="how-it" id="how-it-works" aria-labelledby="how-h">
       <div class="how-head">
         <p class="kicker">How it works</p>
-        <h2 id="how-h">From uncertainty to a price you can trade.</h2>
+        <h2 id="how-h">From market data to a settled result, with a check on the data at every step.</h2>
       </div>
       <ol class="stack" aria-label="The stack">
-        <li><span class="stack-n">01</span><b>Market data</b><span>CoinMarketCap prices, volatility and sentiment.</span></li>
-        <li><span class="stack-n">02</span><b>Probabilistic intelligence</b><span>Cournot, an AI oracle, gives a chance when it has a matching market.</span></li>
-        <li><span class="stack-n">03</span><b>Market pricing</b><span>The Sooth AMM on BNB Chain sets the live price of cover.</span></li>
-        <li><span class="stack-n">04</span><b>Oracle settlement</b><span>The Atlas Oracle price decides the result. Chainlink for BNB.</span></li>
+        <li><span class="stack-n">01</span><b>Market data</b><span>CoinMarketCap prices, volatility and sentiment. Live feed prices from Atlas and Chainlink.</span></li>
+        <li><span class="stack-n">02</span><b>Probabilistic reasoning</b><span>The agent turns the data into a fair chance. Cournot, an AI oracle, adds its chance when it has a matching market.</span></li>
+        <li><span class="stack-n">03</span><b>Oracle-aware risk control</b><span>The agent checks the Atlas Consensus Score. HEALTHY: full size. DEGRADED: half size. Worse, an API error or old data: no trade.</span></li>
+        <li><span class="stack-n">04</span><b>Autonomous execution</b><span>When the market is far from the fair chance, the agent trades on the Sooth AMM on BNB Chain, within a daily cap.</span></li>
+        <li><span class="stack-n">05</span><b>Settlement</b><span>At the deadline, the contract reads the oracle price and writes the result. Nobody votes.</span></li>
       </ol>
       <ul class="features">
         <li><h3>AI risk intelligence</h3><p>The risk agent reads CoinMarketCap data and, when it exists, the Cournot chance. Fixed rules turn them into a fair chance.</p></li>
@@ -305,6 +338,7 @@
         <ol class="steps">
           <li><span class="step-role">Creator</span><p>Opens a market with a fixed feed, level and time.</p><code>terms(market)</code></li>
           <li><span class="step-role">Pricer</span><p>Reads CoinMarketCap and Cournot and writes a fair price.</p><code>agent/run.mjs</code></li>
+          <li><span class="step-role">Risk control</span><p>Reads the signed Atlas price and the Consensus Score, and sets the trade size or stops the trade.</p><code>atlasGate()</code></li>
           <li><span class="step-role">Trader</span><p>Buys only when the market is far from the fair price.</p><code>tradePositions(...)</code></li>
           <li><span class="step-role">Settler</span><p>Reads the oracle after the time and proposes the result.<span id="vetoNote" hidden> A guardian can veto for <span id="vetoMin">a short time</span>.</span></p><code>settleFromFeed → settle → settlePosition</code></li>
         </ol>

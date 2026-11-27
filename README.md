@@ -4,7 +4,15 @@ Price the Unknown. Live demo: https://noesis-7fg.pages.dev
 
 NOESIS is built on Sooth. The code and contracts below use the working name Sooth Hedge.
 
-Risk markets for agents on BNB Chain.
+The oracle-powered autonomous hedging agent on BNB Chain. NOESIS does not just price market risk. It checks how reliable the data is behind every decision.
+
+Market Data → Probabilistic Reasoning → Oracle-aware Risk Control → Autonomous Execution → Settlement
+
+- **Market Data:** CoinMarketCap prices, volatility and sentiment. Feed prices from Atlas and Chainlink.
+- **Probabilistic Reasoning:** the agent's fair chance. Cournot adds its chance when it has a matching market.
+- **Oracle-aware Risk Control:** `atlasGate()` in `agent/src/atlas.mjs`. HEALTHY: full size. DEGRADED: half size. WARNING, CRITICAL, SPLIT_MARKET, a bad signature, an API error or data older than 15 min: no trade.
+- **Autonomous Execution:** the agent trades on the Sooth AMM when the edge is more than 5 points, within a daily cap.
+- **Settlement:** the contract reads the oracle price at the deadline. No guardian, no vote.
 
 CoinMarketCap finds the risk. Cournot gives the odds, with evidence. The Atlas Consensus Score says how much to trust the data. Sooth prices and trades the risk. Atlas Oracle settles it on-chain, with no person in the loop.
 
