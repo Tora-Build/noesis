@@ -636,3 +636,15 @@ dialog::backdrop { background: rgba(11, 13, 18, .55); }
 .gate-bad { color: var(--neg); }
 .gate-wait, .gate-none { color: var(--ink); }
 .feeds > .small.muted { margin: 12px 0 0; }
+
+/* What NOESIS runs on */
+.used { padding-top: 40px; }
+.used .kicker { margin: 0 0 16px; }
+.used-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.used-list li { display: flex; flex-direction: column; gap: 6px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); box-shadow: var(--shadow); }
+.used-list b { font-size: 15px; }
+.used-list span { font-size: 13px; color: var(--ink-2); flex: 1; }
+.used-list a { font-size: 13px; font-weight: 600; color: var(--ink); }
+@media (max-width: 1060px) { .used-list { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .used-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 400px) { .used-list { grid-template-columns: 1fr; } }
