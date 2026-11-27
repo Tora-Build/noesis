@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NOESIS · Oracle intelligence</title>
+  <meta name="description" content="Live Atlas data feeds, Consensus Scores and how the NOESIS risk agent uses them.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0B0D12">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/svg+xml" href="mark.svg">
+  <link rel="modulepreload" href="vendor/viem.js">
+</head>
+<body class="ix">
+  <a class="skip" href="#feeds">Skip to the feeds</a>
+  <header class="bar on-dark">
+    <div class="bar-in">
+      <a class="brand" href="./" aria-label="NOESIS, home">
+        <svg class="mark" viewBox="31.5 0.5 97 97" width="28" height="28" aria-hidden="true" focusable="false"><circle cx="80" cy="49" r="48.5" fill="#F9F4E3"/><circle cx="80" cy="49" r="39" fill="#FFD200" stroke="#0B0D12" stroke-width="7"/><path d="M47 68 A39 39 0 0 1 106 20 Z" fill="#F9F4E3"/><ellipse cx="80" cy="49" rx="43" ry="14" transform="rotate(-47 80 49)" fill="#F9F4E3" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="39" fill="none" stroke="#0B0D12" stroke-width="7"/><circle cx="80" cy="49" r="5" fill="#0B0D12"/></svg>
+        <span class="word">NOESIS</span>
+      </a>
+      <nav class="nav" aria-label="Pages">
+        <a href="./#protect">Protect</a>
+        <a href="./#strikes">Levels</a>
+        <a href="./#agent">Risk agent</a>
+        <a href="intel.html" aria-current="page">Oracle intelligence</a>
+        <a href="./#how-it-works">How it works</a>
+      </nav>
+      <div class="bar-end">
+        <span class="net" title="Network and latest block"><i class="dot" aria-hidden="true"></i><span>BNB Chain</span><span class="mono muted" id="block"></span></span>
+        <a class="btn btn-amber" href="./#protect">Create protection</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="ix-hero on-dark" aria-labelledby="ix-h">
+    <div class="ix-hero-in">
+      <p class="eyebrow">Oracle intelligence</p>
+      <h1 id="ix-h">The data behind every decision.</h1>
+      <p class="ix-lede">Live Atlas data feeds, their Consensus Score and health, and what the risk agent may do with each one. The agent does not trade on data it cannot trust.</p>
+      <dl class="ix-kpis" id="kpis">
+        <div><dt>Live feeds</dt><dd id="kFeeds"><span class="skel"></span></dd></div>
+        <div><dt>Agent mode now</dt><dd id="kMode"><span class="skel"></span></dd></div>
+        <div><dt>Last Atlas API read</dt><dd id="kRead"><span class="skel"></span></dd></div>
+        <div><dt>Open protection markets</dt><dd id="kMarkets"><span class="skel"></span></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <main class="wrap ix-main">
+    <section id="feeds" aria-labelledby="feeds-h">
+      <div class="ix-head">
+        <h2 id="feeds-h">Data feeds</h2>
+        <p class="muted small" id="fWhen" aria-live="polite">Loading live prices from BNB Chain…</p>
+      </div>
+      <div class="ix-grid" id="feedGrid">
+        <article class="ix-card ix-ghost"><span class="skel skel-w"></span></article>
+        <article class="ix-card ix-ghost"><span class="skel skel-w"></span></article>
+        <article class="ix-card ix-ghost"><span class="skel skel-w"></span></article>
+      </div>
+    </section>
+
+    <section class="ix-rules" aria-labelledby="rules-h">
+      <div class="ix-head">
+        <h2 id="rules-h">Oracle-aware risk control</h2>
+        <p class="muted small">Before each trade the agent reads the signed Atlas API. The Consensus Score sets the size.</p>
+      </div>
+      <ol class="ix-rule-list" id="rules"></ol>
+      <p class="small muted">Code: <a href="https://github.com/Tora-Build/noesis/blob/main/agent/src/atlas.mjs" target="_blank" rel="noopener noreferrer"><code>atlasGate()</code> in agent/src/atlas.mjs</a>. Atlas signs the price payload. The score comes in the same API response but is not in the signed payload.</p>
+    </section>
+
+    <section aria-labelledby="mk-h">
+      <div class="ix-head">
+        <h2 id="mk-h">Protection markets</h2>
+        <p class="muted small">Every open market, with the Consensus Score the agent saw at its last check.</p>
+      </div>
+      <div class="table-scroll ix-table" tabindex="0" role="region" aria-label="Protection markets table">
+        <table class="grid-t" id="mkT">
+          <thead><tr>
+            <th scope="col">Market</th>
+            <th scope="col">Ends</th>
+            <th scope="col" class="r">Market chance</th>
+            <th scope="col" class="r">Agent estimate</th>
+            <th scope="col">Consensus</th>
+            <th scope="col">Agent</th>
+          </tr></thead>
+          <tbody><tr><td colspan="6" class="empty"><span class="skel skel-w"></span></td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot on-dark">
+    <div class="foot-in">
+      <p>Prices: Atlas MultiFeed and Chainlink on BNB Chain, read live. Consensus Score: Atlas Pull API, read by the agent every 30 min. Market chances: Sooth AMM.</p>
+      <p class="built"><a href="./">Back to NOESIS</a> · Built on Sooth.</p>
+    </div>
+  </footer>
+  <script type="module" src="intel.js"></script>
+</body>
+</html>
